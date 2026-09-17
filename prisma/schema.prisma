@@ -1,0 +1,329 @@
+// Prisma schema — ver docs/PROYECTO.md para el contexto de negocio completo.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==================== USUARIO Y SESIONES ====================
+// Diseñado desde ya para 1 usuario, pero sin cerrar la puerta a roles.
+
+enum RolUsuario {
+  ADMIN
+}
+
+model Usuario {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  nombre       String
+  passwordHash String
+  rol          RolUsuario @default(ADMIN)
+  activo       Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  sesiones Sesion[]
+}
+
+model Sesion {
+  id        String   @id @default(cuid())
+  usuarioId String
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+  tokenHash String   @unique
+  userAgent String?
+  ip        String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([usuarioId])
+}
+
+// ==================== CLIENTE Y MOTOCICLETA ====================
+
+enum TipoIdentificacion {
+  CC
+  CE
+  PASAPORTE
+  NIT
+  OTRO
+}
+
+model Cliente {
+  id                   String             @id @default(cuid())
+  nombreCompleto       String
+  tipoIdentificacion   TipoIdentificacion @default(CC)
+  numeroIdentificacion String             @unique
+  telefono             String?
+  email                String?
+  direccion            String?
+  notas                String?
+  activo               Boolean            @default(true)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  contratos  Contrato[]
+  prestamos  Prestamo[]
+  documentos Documento[]
+}
+
+enum EstadoMoto {
+  DISPONIBLE
+  EN_CONTRATO
+  VENDIDA
+}
+
+model Motocicleta {
+  id            String     @id @default(cuid())
+  marca         String
+  modelo        String
+  placa         String     @unique
+  color         String?
+  anioModelo    Int?
+  precioInicial Int
+  estado        EstadoMoto @default(DISPONIBLE)
+  notas         String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  contratos Contrato[]
+  gastos    Gasto[]
+  prestamos Prestamo[]
+}
+
+// ==================== CONTRATO ====================
+
+enum EstadoContrato {
+  ACTIVO
+  FINALIZADO_PAGADO
+  FINALIZADO_COMPRADO
+  INCUMPLIDO_RECUPERADA
+}
+
+model Contrato {
+  id    String @id @default(cuid())
+  folio Int    @unique @default(autoincrement()) // se formatea en la UI como "CT-0001"
+
+  clienteId     String
+  cliente       Cliente     @relation(fields: [clienteId], references: [id])
+  motocicletaId String
+  motocicleta   Motocicleta @relation(fields: [motocicletaId], references: [id])
+
+  valorTotalContrato    Int
+  arriendoFijoMensual   Int /// USADO por el motor de cierre
+  metaMensualReferencia Int? /// SOLO informativo ("Meta mensual estimada" en la UI) — nunca entra al cálculo
+  cuotaDiariaReferencia Int? /// SOLO informativo — nunca entra al cálculo
+
+  fechaInicio      DateTime  @db.Date
+  fechaFinEstimada DateTime? @db.Date
+
+  saldoCapitalPendiente     Int
+  moraAcumulada             Int      @default(0)
+  fechaAperturaPeriodoActual DateTime @db.Date
+
+  estado  EstadoContrato @default(ACTIVO)
+  version Int            @default(0) // bloqueo optimista en el cierre
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  finalizadoAt DateTime?
+
+  pagos          Pago[]
+  periodosCierre PeriodoCierre[]
+  gastos         Gasto[]
+  prestamos      Prestamo[]
+  documentos     Documento[]
+
+  @@index([estado])
+  @@index([clienteId])
+  @@index([motocicletaId])
+}
+
+// ==================== PAGO Y PERIODO DE CIERRE (el ledger) ====================
+
+enum MetodoPago {
+  TRANSFERENCIA
+  EFECTIVO
+  OTRO
+}
+
+model Pago {
+  id              String         @id @default(cuid())
+  contratoId      String
+  contrato        Contrato       @relation(fields: [contratoId], references: [id])
+  periodoCierreId String? // null = periodo abierto; se fija al cerrar y nunca cambia
+  periodoCierre   PeriodoCierre? @relation(fields: [periodoCierreId], references: [id])
+
+  fecha      DateTime   @db.Date // fecha real del pago (puede ser retroactiva)
+  monto      Int
+  metodo     MetodoPago @default(TRANSFERENCIA)
+  referencia String?
+  notas      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  documentos Documento[] // comprobante(s), opcional
+
+  @@index([contratoId, periodoCierreId])
+  @@index([fecha])
+}
+
+enum TipoCierre {
+  NORMAL
+  COMPRA_ANTICIPADA
+}
+
+model PeriodoCierre {
+  id            String     @id @default(cuid())
+  contratoId    String
+  contrato      Contrato   @relation(fields: [contratoId], references: [id])
+  numeroPeriodo Int
+  tipoCierre    TipoCierre @default(NORMAL)
+
+  fechaAperturaPeriodo DateTime @db.Date
+  fechaCierre          DateTime @default(now())
+
+  // snapshot inmutable de todo lo usado en el cálculo (auditable aunque el
+  // arriendo fijo del contrato cambie después):
+  moraAnterior         Int
+  arriendoFijoUsado    Int
+  metaArriendo         Int
+  cobradoPeriodo       Int
+  arriendoCubierto     Int
+  abonoCapital         Int
+  moraNueva            Int
+  saldoCapitalAnterior Int
+  saldoCapitalNuevo    Int
+  excedenteNoAplicado  Int     @default(0) // solo relevante en COMPRA_ANTICIPADA
+  contratoFinalizado   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  pagos      Pago[]
+  documentos Documento[] // el PDF del recibo generado
+
+  @@unique([contratoId, numeroPeriodo])
+  @@index([contratoId])
+}
+
+// ==================== GASTO (solo reportería, no afecta al cliente) ====================
+
+enum CategoriaGasto {
+  MANTENIMIENTO
+  REPARACION
+  SEGURO
+  IMPUESTOS
+  OTRO
+}
+
+model Gasto {
+  id            String         @id @default(cuid())
+  motocicletaId String
+  motocicleta   Motocicleta    @relation(fields: [motocicletaId], references: [id])
+  contratoId    String?
+  contrato      Contrato?      @relation(fields: [contratoId], references: [id])
+
+  fecha       DateTime       @db.Date
+  categoria   CategoriaGasto @default(MANTENIMIENTO)
+  descripcion String
+  monto       Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  documentos Documento[]
+
+  @@index([motocicletaId])
+  @@index([contratoId])
+}
+
+// ==================== PRÉSTAMO (ledger 100% independiente) ====================
+
+enum EstadoPrestamo {
+  ACTIVO
+  PAGADO
+}
+
+model Prestamo {
+  id            String       @id @default(cuid())
+  clienteId     String
+  cliente       Cliente      @relation(fields: [clienteId], references: [id])
+  motocicletaId String?
+  motocicleta   Motocicleta? @relation(fields: [motocicletaId], references: [id])
+  contratoId    String? // solo referencia informativa, sin ligarse al ledger de arriendo
+  contrato      Contrato?    @relation(fields: [contratoId], references: [id])
+
+  fecha          DateTime       @db.Date
+  montoOriginal  Int
+  saldoPendiente Int
+  motivo         String?
+  estado         EstadoPrestamo @default(ACTIVO)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  abonos     AbonoPrestamo[]
+  documentos Documento[]
+
+  @@index([clienteId])
+}
+
+model AbonoPrestamo {
+  id         String   @id @default(cuid())
+  prestamoId String
+  prestamo   Prestamo @relation(fields: [prestamoId], references: [id])
+
+  fecha DateTime @db.Date
+  monto Int
+
+  createdAt DateTime @default(now())
+
+  documentos Documento[]
+
+  @@index([prestamoId])
+}
+
+// ==================== DOCUMENTO (adjuntos genéricos) ====================
+
+enum TipoArchivo {
+  CEDULA
+  COMPROBANTE_PAGO
+  CONTRATO_FIRMADO
+  RECIBO_PERIODO
+  SOPORTE_GASTO
+  SOPORTE_PRESTAMO
+  OTRO
+}
+
+model Documento {
+  id                 String      @id @default(cuid())
+  tipo               TipoArchivo
+  nombreOriginal     String
+  rutaAlmacenamiento String
+  mimeType           String
+  tamanioBytes       Int
+
+  clienteId       String?
+  cliente         Cliente?       @relation(fields: [clienteId], references: [id])
+  contratoId      String?
+  contrato        Contrato?      @relation(fields: [contratoId], references: [id])
+  pagoId          String?
+  pago            Pago?          @relation(fields: [pagoId], references: [id])
+  periodoCierreId String?
+  periodoCierre   PeriodoCierre? @relation(fields: [periodoCierreId], references: [id])
+  gastoId         String?
+  gasto           Gasto?         @relation(fields: [gastoId], references: [id])
+  prestamoId      String?
+  prestamo        Prestamo?      @relation(fields: [prestamoId], references: [id])
+  abonoPrestamoId String?
+  abonoPrestamo   AbonoPrestamo? @relation(fields: [abonoPrestamoId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([contratoId])
+  @@index([clienteId])
+}
