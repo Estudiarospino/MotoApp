@@ -4,10 +4,9 @@ import { getCurrentUser } from "@/server/auth/session";
 import { formatFecha, formatFolioContrato } from "@/lib/format";
 import { construirFiltroPagos, type PagosSearchParams } from "@/lib/pagos-filtro";
 
-const METODO_LABEL: Record<string, string> = {
-  TRANSFERENCIA: "Transferencia",
-  EFECTIVO: "Efectivo",
-  OTRO: "Otro",
+const TIPO_LABEL: Record<string, string> = {
+  ARRIENDO: "Arriendo",
+  ABONO_CAPITAL: "Abono a capital",
 };
 
 function celdaCsv(valor: string): string {
@@ -29,19 +28,21 @@ export async function GET(request: NextRequest) {
     include: {
       contrato: { select: { folio: true, cliente: { select: { nombreCompleto: true } } } },
       periodoCierre: { select: { numeroPeriodo: true } },
+      metodoPago: { select: { nombre: true } },
     },
   });
 
-  const encabezados = ["Fecha", "Contrato", "Cliente", "Método", "Monto", "Referencia", "Periodo", "Notas"];
+  const encabezados = ["Fecha", "Contrato", "Cliente", "Tipo", "Método", "Monto", "Referencia", "Periodo", "Notas"];
   const filas = pagos.map((p) =>
     [
       formatFecha(p.fecha),
       formatFolioContrato(p.contrato.folio),
       p.contrato.cliente.nombreCompleto,
-      METODO_LABEL[p.metodo] ?? p.metodo,
+      TIPO_LABEL[p.tipo] ?? p.tipo,
+      p.metodoPago.nombre,
       p.monto.toString(),
       p.referencia ?? "",
-      p.periodoCierre ? `Periodo ${p.periodoCierre.numeroPeriodo}` : "Abierto",
+      p.tipo === "ABONO_CAPITAL" ? "—" : p.periodoCierre ? `Periodo ${p.periodoCierre.numeroPeriodo}` : "Abierto",
       p.notas ?? "",
     ]
       .map(celdaCsv)

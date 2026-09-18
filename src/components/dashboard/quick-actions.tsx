@@ -4,6 +4,7 @@ import { cn } from "cn";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DialogTrigger } from "@/components/ui/dialog";
 import { RegistrarPagoPicker, type ContratoParaPago } from "@/components/pagos/registrar-pago-picker";
+import type { MetodoPagoOpcion } from "@/app/(dashboard)/contratos/pago-form";
 
 const ACCIONES = [
   { label: "Nuevo cliente", href: "/clientes/nuevo", icon: Users },
@@ -14,7 +15,13 @@ const ACCIONES = [
 
 const CLASE_BOTON = "flex items-center gap-2 rounded-lg border border-border px-2.5 py-2.5 text-[13px] font-medium transition-colors hover:bg-muted";
 
-export function QuickActions({ contratosActivos }: { contratosActivos: ContratoParaPago[] }) {
+export function QuickActions({
+  contratosActivos,
+  metodosPago,
+}: {
+  contratosActivos: ContratoParaPago[];
+  metodosPago: MetodoPagoOpcion[];
+}) {
   return (
     <Card className="h-full">
       <CardHeader>
@@ -31,6 +38,7 @@ export function QuickActions({ contratosActivos }: { contratosActivos: ContratoP
 
         <RegistrarPagoPicker
           contratos={contratosActivos}
+          metodosPago={metodosPago}
           trigger={
             <DialogTrigger className={CLASE_BOTON}>
               <Receipt className="size-4 shrink-0" />

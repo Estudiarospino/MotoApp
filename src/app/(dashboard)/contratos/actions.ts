@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import {
   parseCrearContratoFormData,
   parseEditarContratoFormData,
+  parseRenegociarContratoFormData,
 } from "@/lib/validation/contrato";
 
 export type ContratoFormState = {
@@ -15,6 +16,8 @@ export type ContratoFormState = {
 };
 
 class MotoNoDisponibleError extends Error {}
+class ContratoAnteriorNoValidoError extends Error {}
+class YaRenegociadoError extends Error {}
 
 export async function createContrato(
   _prevState: ContratoFormState,
@@ -34,6 +37,7 @@ export async function createContrato(
     arriendoFijoMensual,
     metaMensualReferencia,
     cuotaDiariaReferencia,
+    frecuenciaPago,
   } = parsed.data;
 
   try {
@@ -56,6 +60,7 @@ export async function createContrato(
           arriendoFijoMensual,
           metaMensualReferencia,
           cuotaDiariaReferencia,
+          frecuenciaPago,
           fechaInicio,
           fechaFinEstimada,
           saldoCapitalPendiente: valorTotalContrato,
@@ -93,7 +98,7 @@ export async function updateContrato(
   // `undefined` significa "no tocar el campo" para Prisma: los campos
   // opcionales que el usuario dejó vacíos deben mandarse como `null`
   // explícito para poder limpiarlos.
-  const { arriendoFijoMensual, metaMensualReferencia, cuotaDiariaReferencia, fechaFinEstimada } =
+  const { arriendoFijoMensual, metaMensualReferencia, cuotaDiariaReferencia, frecuenciaPago, fechaFinEstimada } =
     parsed.data;
 
   await prisma.contrato.update({
@@ -102,6 +107,7 @@ export async function updateContrato(
       arriendoFijoMensual,
       metaMensualReferencia: metaMensualReferencia ?? null,
       cuotaDiariaReferencia: cuotaDiariaReferencia ?? null,
+      frecuenciaPago,
       fechaFinEstimada: fechaFinEstimada ?? null,
     },
   });
@@ -109,4 +115,100 @@ export async function updateContrato(
   revalidatePath("/contratos");
   revalidatePath(`/contratos/${id}`);
   redirect(`/contratos/${id}`);
+}
+
+/**
+ * Renegociación: crea un contrato nuevo para el mismo cliente y le traslada la
+ * deuda pendiente (capital + mora) de un contrato INCUMPLIDO_RECUPERADA. El
+ * contrato anterior no cambia de estado — solo queda el vínculo trazable.
+ */
+export async function crearContratoRenegociado(
+  _prevState: ContratoFormState,
+  formData: FormData,
+): Promise<ContratoFormState> {
+  const parsed = parseRenegociarContratoFormData(formData);
+  if (!parsed.success) {
+    return { fieldErrors: z.flattenError(parsed.error).fieldErrors as Record<string, string[]> };
+  }
+
+  const {
+    contratoAnteriorId,
+    clienteId,
+    motocicletaId,
+    fechaInicio,
+    fechaFinEstimada,
+    deudaTrasladada,
+    valorTotalContrato,
+    arriendoFijoMensual,
+    metaMensualReferencia,
+    cuotaDiariaReferencia,
+    frecuenciaPago,
+  } = parsed.data;
+
+  let nuevoContratoId = "";
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const contratoAnterior = await tx.contrato.findUniqueOrThrow({ where: { id: contratoAnteriorId } });
+      if (contratoAnterior.estado !== "INCUMPLIDO_RECUPERADA" || contratoAnterior.clienteId !== clienteId) {
+        throw new ContratoAnteriorNoValidoError();
+      }
+
+      const yaRenegociado = await tx.renegociacionContrato.findUnique({ where: { contratoAnteriorId } });
+      if (yaRenegociado) {
+        throw new YaRenegociadoError();
+      }
+
+      const motoActualizada = await tx.motocicleta.updateMany({
+        where: { id: motocicletaId, estado: "DISPONIBLE" },
+        data: { estado: "EN_CONTRATO" },
+      });
+      if (motoActualizada.count === 0) {
+        throw new MotoNoDisponibleError();
+      }
+
+      const contratoNuevo = await tx.contrato.create({
+        data: {
+          clienteId,
+          motocicletaId,
+          valorTotalContrato,
+          arriendoFijoMensual,
+          metaMensualReferencia,
+          cuotaDiariaReferencia,
+          frecuenciaPago,
+          fechaInicio,
+          fechaFinEstimada,
+          saldoCapitalPendiente: valorTotalContrato,
+          fechaAperturaPeriodoActual: fechaInicio,
+        },
+      });
+
+      await tx.renegociacionContrato.create({
+        data: {
+          contratoAnteriorId,
+          contratoNuevoId: contratoNuevo.id,
+          deudaTrasladada,
+          fecha: fechaInicio,
+        },
+      });
+
+      nuevoContratoId = contratoNuevo.id;
+    });
+  } catch (error) {
+    if (error instanceof MotoNoDisponibleError) {
+      return { error: "Esa moto ya no está disponible. Elige otra." };
+    }
+    if (error instanceof ContratoAnteriorNoValidoError) {
+      return { error: "El contrato anterior ya no es válido para renegociar (no está incumplido o es de otro cliente)." };
+    }
+    if (error instanceof YaRenegociadoError) {
+      return { error: "Ese contrato ya fue renegociado antes en otro contrato nuevo." };
+    }
+    throw error;
+  }
+
+  revalidatePath("/contratos");
+  revalidatePath("/motos");
+  revalidatePath(`/contratos/${contratoAnteriorId}`);
+  redirect(`/contratos/${nuevoContratoId}`);
 }

@@ -48,11 +48,21 @@ async function crearContratoActivo(opts: {
   });
 }
 
+let metodoPagoIdPorDefecto: string;
+
 async function registrarPago(contratoId: string, fecha: Date, monto: number) {
-  await prisma.pago.create({ data: { contratoId, fecha, monto } });
+  await prisma.pago.create({ data: { contratoId, fecha, monto, metodoPagoId: metodoPagoIdPorDefecto } });
 }
 
 async function main() {
+  const metodoDefecto = await prisma.metodoPago.findFirst({ where: { activo: true } });
+  if (!metodoDefecto) {
+    throw new Error(
+      "No hay métodos de pago configurados. Aplica las migraciones (traen la semilla de Cuenta/MetodoPago) antes de correr este script.",
+    );
+  }
+  metodoPagoIdPorDefecto = metodoDefecto.id;
+
   console.log("Creando clientes...");
   const [cliente1, cliente2, cliente3, cliente4, cliente5, cliente6, cliente7, cliente8] = await Promise.all([
     prisma.cliente.create({

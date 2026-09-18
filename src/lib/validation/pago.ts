@@ -1,12 +1,15 @@
 import { z } from "zod";
 import { fechaDesdeFormulario, pesosPositivosDesdeFormulario, textoOpcional } from "./helpers";
 
-export const METODOS_PAGO = ["TRANSFERENCIA", "EFECTIVO", "OTRO"] as const;
+const cuid = z.string().min(1, "Selecciona un método de pago");
+
+export const TIPOS_PAGO = ["ARRIENDO", "ABONO_CAPITAL"] as const;
 
 export const pagoSchema = z.object({
+  tipo: z.enum(TIPOS_PAGO).default("ARRIENDO"),
   fecha: fechaDesdeFormulario,
   monto: pesosPositivosDesdeFormulario,
-  metodo: z.enum(METODOS_PAGO),
+  metodoPagoId: cuid,
   referencia: textoOpcional,
   notas: textoOpcional,
 });
@@ -15,9 +18,10 @@ export type PagoInput = z.infer<typeof pagoSchema>;
 
 export function parsePagoFormData(formData: FormData) {
   return pagoSchema.safeParse({
+    tipo: formData.get("tipo") || undefined,
     fecha: formData.get("fecha"),
     monto: formData.get("monto"),
-    metodo: formData.get("metodo"),
+    metodoPagoId: formData.get("metodoPagoId"),
     referencia: formData.get("referencia"),
     notas: formData.get("notas"),
   });

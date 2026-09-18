@@ -2,7 +2,8 @@ import { Prisma, $Enums } from "@/generated/prisma/client";
 
 export type PagosSearchParams = {
   q?: string;
-  metodo?: string;
+  tipo?: string;
+  metodoPagoId?: string;
   estado?: string;
   fecha?: string;
   page?: string;
@@ -21,12 +22,14 @@ export function construirFiltroPagos(sp: PagosSearchParams): {
   where: Prisma.PagoWhereInput;
   orderBy: Prisma.PagoOrderByWithRelationInput;
   q: string;
-  metodo: string;
+  tipo: string;
+  metodoPagoId: string;
   estado: string;
   fecha: string;
 } {
   const q = sp.q?.trim() ?? "";
-  const metodo = sp.metodo ?? "todos";
+  const tipo = sp.tipo ?? "todos";
+  const metodoPagoId = sp.metodoPagoId ?? "todos";
   const estado = sp.estado ?? "todos";
   const fecha = sp.fecha ?? "todas";
 
@@ -45,9 +48,14 @@ export function construirFiltroPagos(sp: PagosSearchParams): {
         { referencia: { contains: q, mode: Prisma.QueryMode.insensitive } },
       ],
     }),
-    ...(metodo !== "todos" && { metodo: metodo as $Enums.MetodoPago }),
+    ...(tipo !== "todos" && { tipo: tipo as $Enums.TipoPago }),
+    ...(metodoPagoId !== "todos" && { metodoPagoId }),
     ...(estado === "con_recibo" && { periodoCierreId: { not: null } }),
-    ...(estado === "periodo_abierto" && { periodoCierreId: null }),
+    ...(estado === "periodo_abierto" && {
+      periodoCierreId: null,
+      // los abonos a capital nunca están "en periodo abierto"; solo forzamos ARRIENDO si el usuario no eligió tipo
+      tipo: tipo !== "todos" ? (tipo as $Enums.TipoPago) : "ARRIENDO",
+    }),
     ...(fecha === "este_mes" && { fecha: { gte: esteMes } }),
     ...(fecha === "mes_anterior" && { fecha: { gte: mesAnterior, lt: esteMes } }),
     ...(fecha === "este_anio" && { fecha: { gte: esteAnio } }),
@@ -55,5 +63,5 @@ export function construirFiltroPagos(sp: PagosSearchParams): {
 
   const orderBy: Prisma.PagoOrderByWithRelationInput = { fecha: "desc" };
 
-  return { where, orderBy, q, metodo, estado, fecha };
+  return { where, orderBy, q, tipo, metodoPagoId, estado, fecha };
 }

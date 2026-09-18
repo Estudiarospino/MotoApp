@@ -5,16 +5,18 @@ import { ChevronLeft, Search } from "lucide-react";
 import { formatFolioContrato } from "@/lib/format";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { PagoForm } from "@/app/(dashboard)/contratos/pago-form";
+import { PagoForm, type MetodoPagoOpcion } from "@/app/(dashboard)/contratos/pago-form";
 
-export type ContratoParaPago = { id: string; folio: number; clienteNombre: string };
+export type ContratoParaPago = { id: string; folio: number; clienteNombre: string; saldoCapitalPendiente: number };
 
 export function RegistrarPagoPicker({
   contratos,
+  metodosPago,
   contratoIdInicial,
   trigger,
 }: {
   contratos: ContratoParaPago[];
+  metodosPago: MetodoPagoOpcion[];
   contratoIdInicial?: string;
   trigger: React.ReactNode;
 }) {
@@ -63,7 +65,12 @@ export function RegistrarPagoPicker({
             <p className="-mt-2 text-sm text-muted-foreground">
               {formatFolioContrato(contratoSeleccionado.folio)} — {contratoSeleccionado.clienteNombre}
             </p>
-            <PagoForm contratoId={contratoSeleccionado.id} onSuccess={() => setOpen(false)} />
+            <PagoForm
+              contratoId={contratoSeleccionado.id}
+              saldoCapitalPendiente={contratoSeleccionado.saldoCapitalPendiente}
+              metodosPago={metodosPago}
+              onSuccess={() => setOpen(false)}
+            />
           </>
         ) : (
           <div className="flex flex-col gap-3">

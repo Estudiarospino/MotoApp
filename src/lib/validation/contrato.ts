@@ -2,11 +2,14 @@ import { z } from "zod";
 import {
   fechaDesdeFormulario,
   fechaOpcionalDesdeFormulario,
+  pesosDesdeFormulario,
   pesosOpcionalDesdeFormulario,
   pesosPositivosDesdeFormulario,
 } from "./helpers";
 
 const cuid = z.string().min(1, "Selecciona una opción");
+
+export const FRECUENCIAS_PAGO = ["DIARIO", "SEMANAL", "QUINCENAL", "MENSUAL"] as const;
 
 /** Campos comunes a la creación y edición: los términos financieros del contrato. */
 const terminosContratoSchema = {
@@ -14,6 +17,7 @@ const terminosContratoSchema = {
   arriendoFijoMensual: pesosPositivosDesdeFormulario,
   metaMensualReferencia: pesosOpcionalDesdeFormulario,
   cuotaDiariaReferencia: pesosOpcionalDesdeFormulario,
+  frecuenciaPago: z.enum(FRECUENCIAS_PAGO).default("MENSUAL"),
   fechaFinEstimada: fechaOpcionalDesdeFormulario,
 };
 
@@ -35,6 +39,35 @@ export function parseCrearContratoFormData(formData: FormData) {
     arriendoFijoMensual: formData.get("arriendoFijoMensual"),
     metaMensualReferencia: formData.get("metaMensualReferencia"),
     cuotaDiariaReferencia: formData.get("cuotaDiariaReferencia"),
+    frecuenciaPago: formData.get("frecuenciaPago") || undefined,
+    fechaFinEstimada: formData.get("fechaFinEstimada"),
+  });
+}
+
+/** Renegociación: crea un contrato nuevo trasladándole la deuda de uno INCUMPLIDO_RECUPERADA. */
+export const renegociarContratoSchema = z.object({
+  contratoAnteriorId: cuid,
+  clienteId: cuid,
+  motocicletaId: cuid,
+  fechaInicio: fechaDesdeFormulario,
+  deudaTrasladada: pesosDesdeFormulario,
+  ...terminosContratoSchema,
+});
+
+export type RenegociarContratoInput = z.infer<typeof renegociarContratoSchema>;
+
+export function parseRenegociarContratoFormData(formData: FormData) {
+  return renegociarContratoSchema.safeParse({
+    contratoAnteriorId: formData.get("contratoAnteriorId"),
+    clienteId: formData.get("clienteId"),
+    motocicletaId: formData.get("motocicletaId"),
+    fechaInicio: formData.get("fechaInicio"),
+    deudaTrasladada: formData.get("deudaTrasladada"),
+    valorTotalContrato: formData.get("valorTotalContrato"),
+    arriendoFijoMensual: formData.get("arriendoFijoMensual"),
+    metaMensualReferencia: formData.get("metaMensualReferencia"),
+    cuotaDiariaReferencia: formData.get("cuotaDiariaReferencia"),
+    frecuenciaPago: formData.get("frecuenciaPago") || undefined,
     fechaFinEstimada: formData.get("fechaFinEstimada"),
   });
 }
@@ -48,6 +81,7 @@ export const editarContratoSchema = z.object({
   arriendoFijoMensual: pesosPositivosDesdeFormulario,
   metaMensualReferencia: pesosOpcionalDesdeFormulario,
   cuotaDiariaReferencia: pesosOpcionalDesdeFormulario,
+  frecuenciaPago: z.enum(FRECUENCIAS_PAGO).default("MENSUAL"),
   fechaFinEstimada: fechaOpcionalDesdeFormulario,
 });
 
@@ -58,6 +92,7 @@ export function parseEditarContratoFormData(formData: FormData) {
     arriendoFijoMensual: formData.get("arriendoFijoMensual"),
     metaMensualReferencia: formData.get("metaMensualReferencia"),
     cuotaDiariaReferencia: formData.get("cuotaDiariaReferencia"),
+    frecuenciaPago: formData.get("frecuenciaPago") || undefined,
     fechaFinEstimada: formData.get("fechaFinEstimada"),
   });
 }

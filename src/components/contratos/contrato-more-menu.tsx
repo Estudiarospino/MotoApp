@@ -16,6 +16,7 @@ export function ContratoMoreMenu({
     arriendoFijoMensual: string;
     metaMensualReferencia?: string;
     cuotaDiariaReferencia?: string;
+    frecuenciaPago?: string;
     fechaFinEstimada?: string;
   };
 }) {

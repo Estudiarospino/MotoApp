@@ -2,7 +2,8 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import { useFormStatus } from "react-dom";
-import { StickyNote } from "lucide-react";
+import { PencilLine, StickyNote } from "lucide-react";
+import { formatCOP } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { FormFieldError } from "@/components/form-field-error";
@@ -19,7 +20,12 @@ function BotonGuardar() {
   );
 }
 
-export type NotaContratoItem = { id: string; contenido: string; createdAt: string };
+export type NotaContratoItem = {
+  id: string;
+  contenido: string;
+  createdAt: string;
+  pago: { fecha: string; monto: number } | null;
+};
 
 export function TabNotas({ contratoId, notas }: { contratoId: string; notas: NotaContratoItem[] }) {
   const action = crearNotaContrato.bind(null, contratoId);
@@ -48,10 +54,21 @@ export function TabNotas({ contratoId, notas }: { contratoId: string; notas: Not
         <div className="flex flex-col gap-3">
           {notas.map((nota) => (
             <div key={nota.id} className="flex gap-3 rounded-lg border border-border p-3">
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                <StickyNote className="size-3.5" />
+              <span
+                className={
+                  nota.pago
+                    ? "flex size-7 shrink-0 items-center justify-center rounded-lg bg-warning/10 text-warning"
+                    : "flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
+                }
+              >
+                {nota.pago ? <PencilLine className="size-3.5" /> : <StickyNote className="size-3.5" />}
               </span>
               <div className="min-w-0 flex-1">
+                {nota.pago && (
+                  <p className="mb-1 text-xs font-medium text-warning">
+                    Corrección del pago del {nota.pago.fecha} — {formatCOP(nota.pago.monto)}
+                  </p>
+                )}
                 <p className="text-sm whitespace-pre-wrap text-foreground">{nota.contenido}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{nota.createdAt}</p>
               </div>

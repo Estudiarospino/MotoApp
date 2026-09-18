@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { toast } from "sonner";
 import { Paperclip, Plus } from "lucide-react";
+import { formatCOP } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,35 +17,47 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FormFieldError } from "@/components/form-field-error";
-import { METODOS_PAGO } from "@/lib/validation/pago";
+import { TIPOS_PAGO } from "@/lib/validation/pago";
 import { registrarPago, type PagoFormState } from "./pagos-actions";
 
 const ESTADO_INICIAL: PagoFormState = {};
 
-const METODO_LABEL: Record<(typeof METODOS_PAGO)[number], string> = {
-  TRANSFERENCIA: "Transferencia",
-  EFECTIVO: "Efectivo",
-  OTRO: "Otro",
+const TIPO_LABEL: Record<(typeof TIPOS_PAGO)[number], string> = {
+  ARRIENDO: "Arriendo",
+  ABONO_CAPITAL: "Abono a capital",
 };
 
-function BotonRegistrar() {
+export type MetodoPagoOpcion = { id: string; nombre: string };
+
+function BotonRegistrar({ tipo }: { tipo: (typeof TIPOS_PAGO)[number] }) {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" size="sm" disabled={pending}>
       <Plus data-icon="inline-start" className="size-4" />
-      {pending ? "Registrando..." : "Registrar pago"}
+      {pending ? "Registrando..." : tipo === "ABONO_CAPITAL" ? "Registrar abono" : "Registrar pago"}
     </Button>
   );
 }
 
-export function PagoForm({ contratoId, onSuccess }: { contratoId: string; onSuccess?: () => void }) {
+export function PagoForm({
+  contratoId,
+  saldoCapitalPendiente,
+  metodosPago,
+  onSuccess,
+}: {
+  contratoId: string;
+  saldoCapitalPendiente: number;
+  metodosPago: MetodoPagoOpcion[];
+  onSuccess?: () => void;
+}) {
   const action = registrarPago.bind(null, contratoId);
   const [state, formAction] = useActionState(action, ESTADO_INICIAL);
   const formRef = useRef<HTMLFormElement>(null);
+  const [tipo, setTipo] = useState<(typeof TIPOS_PAGO)[number]>("ARRIENDO");
 
   useEffect(() => {
     if (state.ok) {
-      toast.success("Pago registrado correctamente.");
+      toast.success(tipo === "ABONO_CAPITAL" ? "Abono a capital registrado correctamente." : "Pago registrado correctamente.");
       formRef.current?.reset();
       onSuccess?.();
     }
@@ -57,6 +70,28 @@ export function PagoForm({ contratoId, onSuccess }: { contratoId: string; onSucc
         <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{state.error}</p>
       )}
 
+      <div className="flex flex-col gap-1">
+        <Label htmlFor="tipo">Tipo de pago</Label>
+        <Select name="tipo" value={tipo} onValueChange={(v) => setTipo(v as (typeof TIPOS_PAGO)[number])}>
+          <SelectTrigger id="tipo" className="w-full">
+            <SelectValue>{(v: string) => TIPO_LABEL[v as (typeof TIPOS_PAGO)[number]] ?? v}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {TIPOS_PAGO.map((t) => (
+              <SelectItem key={t} value={t}>
+                {TIPO_LABEL[t]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {tipo === "ABONO_CAPITAL" && (
+          <p className="text-xs text-muted-foreground">
+            Se aplica de inmediato al saldo de capital, sin esperar al cierre del periodo. Saldo pendiente:{" "}
+            <span className="font-medium text-foreground">{formatCOP(saldoCapitalPendiente)}</span>.
+          </p>
+        )}
+      </div>
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="flex flex-col gap-1">
           <Label htmlFor="fecha">Fecha</Label>
@@ -66,25 +101,34 @@ export function PagoForm({ contratoId, onSuccess }: { contratoId: string; onSucc
 
         <div className="flex flex-col gap-1">
           <Label htmlFor="monto">Monto (COP)</Label>
-          <Input id="monto" name="monto" type="number" required autoFocus />
+          <Input
+            id="monto"
+            name="monto"
+            type="number"
+            required
+            autoFocus
+            max={tipo === "ABONO_CAPITAL" ? saldoCapitalPendiente : undefined}
+          />
           <FormFieldError mensajes={state.fieldErrors?.monto} />
         </div>
 
         <div className="flex flex-col gap-1">
-          <Label htmlFor="metodo">Método</Label>
-          <Select name="metodo" defaultValue="TRANSFERENCIA">
-            <SelectTrigger id="metodo" className="w-full">
-              <SelectValue />
+          <Label htmlFor="metodoPagoId">Método</Label>
+          <Select name="metodoPagoId" defaultValue={metodosPago[0]?.id}>
+            <SelectTrigger id="metodoPagoId" className="w-full">
+              <SelectValue placeholder="Selecciona un método">
+                {(v: string) => metodosPago.find((m) => m.id === v)?.nombre ?? v}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {METODOS_PAGO.map((metodo) => (
-                <SelectItem key={metodo} value={metodo}>
-                  {METODO_LABEL[metodo]}
+              {metodosPago.map((metodo) => (
+                <SelectItem key={metodo.id} value={metodo.id}>
+                  {metodo.nombre}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <FormFieldError mensajes={state.fieldErrors?.metodo} />
+          <FormFieldError mensajes={state.fieldErrors?.metodoPagoId} />
         </div>
 
         <div className="flex flex-col gap-1">
@@ -117,7 +161,7 @@ export function PagoForm({ contratoId, onSuccess }: { contratoId: string; onSucc
       </div>
 
       <div>
-        <BotonRegistrar />
+        <BotonRegistrar tipo={tipo} />
       </div>
     </form>
   );

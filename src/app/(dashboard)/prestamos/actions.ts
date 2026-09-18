@@ -5,7 +5,19 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { restarPesos } from "@/lib/money";
-import { parseAbonoPrestamoFormData, parsePrestamoFormData } from "@/lib/validation/prestamo";
+import {
+  parseAbonoPrestamoFormData,
+  parsePrestamoFormData,
+  parseTransferenciaCapitalFormData,
+} from "@/lib/validation/prestamo";
+import {
+  ClienteNoCoincideError,
+  ConflictoConcurrenciaError,
+  ContratoNoActivoError,
+  MontoExcedeSaldoPrestamoError,
+  PrestamoNoActivoError as TransferenciaPrestamoNoActivoError,
+  transferirPrestamoACapital,
+} from "@/server/engine/transferenciaCapitalService";
 
 export type PrestamoFormState = {
   error?: string;
@@ -82,4 +94,50 @@ export async function registrarAbono(
   revalidatePath(`/prestamos/${prestamoId}`);
   revalidatePath("/prestamos");
   return {};
+}
+
+export type TransferenciaFormState = {
+  error?: string;
+  fieldErrors?: Record<string, string[]>;
+  ok?: boolean;
+};
+
+export async function transferirACapitalAction(
+  prestamoId: string,
+  _prevState: TransferenciaFormState,
+  formData: FormData,
+): Promise<TransferenciaFormState> {
+  const parsed = parseTransferenciaCapitalFormData(formData);
+  if (!parsed.success) {
+    return { fieldErrors: z.flattenError(parsed.error).fieldErrors as Record<string, string[]> };
+  }
+
+  const { contratoId, ...datos } = parsed.data;
+
+  try {
+    await transferirPrestamoACapital(prestamoId, contratoId, datos);
+  } catch (error) {
+    if (error instanceof TransferenciaPrestamoNoActivoError) {
+      return { error: "Este préstamo ya está pagado; no se puede transferir." };
+    }
+    if (error instanceof MontoExcedeSaldoPrestamoError) {
+      return { fieldErrors: { monto: ["No puede superar el saldo pendiente del préstamo."] } };
+    }
+    if (error instanceof ClienteNoCoincideError) {
+      return { error: "El contrato elegido no pertenece al mismo cliente del préstamo." };
+    }
+    if (error instanceof ContratoNoActivoError) {
+      return { error: "Ese contrato ya no está activo." };
+    }
+    if (error instanceof ConflictoConcurrenciaError) {
+      return { error: "Otra operación modificó el contrato al mismo tiempo. Vuelve a intentarlo." };
+    }
+    throw error;
+  }
+
+  revalidatePath(`/prestamos/${prestamoId}`);
+  revalidatePath("/prestamos");
+  revalidatePath(`/contratos/${contratoId}`);
+  revalidatePath("/contratos");
+  return { ok: true };
 }

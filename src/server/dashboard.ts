@@ -52,10 +52,17 @@ export async function getResumenFinanciero(): Promise<MesFinanciero[]> {
   const ahora = new Date();
   const desde = restarMeses(inicioDeMes(ahora), MESES_A_CARGAR - 1);
 
-  const periodos = await prisma.periodoCierre.findMany({
-    where: { fechaCierre: { gte: desde } },
-    select: { fechaCierre: true, arriendoCubierto: true, abonoCapital: true, moraAnterior: true },
-  });
+  const [periodos, abonosCapitalDirectos] = await Promise.all([
+    prisma.periodoCierre.findMany({
+      where: { fechaCierre: { gte: desde } },
+      select: { fechaCierre: true, arriendoCubierto: true, abonoCapital: true, moraAnterior: true },
+    }),
+    // abonos directos a capital: nunca pasan por un PeriodoCierre, se suman aparte por fecha del pago
+    prisma.pago.findMany({
+      where: { tipo: "ABONO_CAPITAL", fecha: { gte: desde } },
+      select: { fecha: true, monto: true },
+    }),
+  ]);
 
   const meses: MesFinanciero[] = [];
   for (let i = MESES_A_CARGAR - 1; i >= 0; i--) {
@@ -81,6 +88,14 @@ export async function getResumenFinanciero(): Promise<MesFinanciero[]> {
     mes.arriendoOperacion = sumarPesos(mes.arriendoOperacion, arriendoOperacion);
     mes.moras = sumarPesos(mes.moras, moraCobrada);
     mes.abonoCapital = sumarPesos(mes.abonoCapital, periodo.abonoCapital);
+    mes.ingresosTotales = sumarPesos(mes.arriendoOperacion, mes.moras, mes.abonoCapital);
+  }
+
+  for (const abono of abonosCapitalDirectos) {
+    const mes = porClave.get(claveMes(abono.fecha));
+    if (!mes) continue;
+
+    mes.abonoCapital = sumarPesos(mes.abonoCapital, abono.monto);
     mes.ingresosTotales = sumarPesos(mes.arriendoOperacion, mes.moras, mes.abonoCapital);
   }
 

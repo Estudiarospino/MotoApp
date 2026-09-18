@@ -27,7 +27,7 @@ function tendenciaPct(actual: number, anterior: number): number | null {
 
 export default async function PagosPage({ searchParams }: { searchParams: Promise<PagosSearchParams> }) {
   const sp = await searchParams;
-  const { where, orderBy, q, metodo, estado, fecha } = construirFiltroPagos(sp);
+  const { where, orderBy, q, tipo, metodoPagoId, estado, fecha } = construirFiltroPagos(sp);
   const pagina = Math.max(1, Number(sp.page) || 1);
   const porPagina = Number(sp.porPagina) || POR_PAGINA_DEFECTO;
 
@@ -43,6 +43,7 @@ export default async function PagosPage({ searchParams }: { searchParams: Promis
     pagosMesAnterior,
     contratosConPagos,
     contratosActivos,
+    metodosPago,
     totalFiltrado,
     pagos,
   ] = await Promise.all([
@@ -59,7 +60,12 @@ export default async function PagosPage({ searchParams }: { searchParams: Promis
     prisma.contrato.findMany({
       where: { estado: "ACTIVO" },
       orderBy: { folio: "desc" },
-      select: { id: true, folio: true, cliente: { select: { nombreCompleto: true } } },
+      select: { id: true, folio: true, saldoCapitalPendiente: true, cliente: { select: { nombreCompleto: true } } },
+    }),
+    prisma.metodoPago.findMany({
+      where: { activo: true },
+      orderBy: { nombre: "asc" },
+      select: { id: true, nombre: true },
     }),
     prisma.pago.count({ where }),
     prisma.pago.findMany({
@@ -69,6 +75,7 @@ export default async function PagosPage({ searchParams }: { searchParams: Promis
       take: porPagina,
       include: {
         contrato: { select: { id: true, folio: true, cliente: { select: { id: true, nombreCompleto: true } } } },
+        metodoPago: { select: { nombre: true } },
       },
     }),
   ]);
@@ -78,12 +85,13 @@ export default async function PagosPage({ searchParams }: { searchParams: Promis
 
   const filas: PagoRow[] = pagos.map((pago) => ({
     id: pago.id,
+    tipo: pago.tipo,
     fechaLabel: formatFecha(pago.fecha),
     contratoId: pago.contrato.id,
     folio: pago.contrato.folio,
     clienteId: pago.contrato.cliente.id,
     clienteNombre: pago.contrato.cliente.nombreCompleto,
-    metodo: pago.metodo,
+    metodoNombre: pago.metodoPago.nombre,
     monto: pago.monto,
     periodoCierreId: pago.periodoCierreId,
   }));
@@ -92,6 +100,7 @@ export default async function PagosPage({ searchParams }: { searchParams: Promis
     id: c.id,
     folio: c.folio,
     clienteNombre: c.cliente.nombreCompleto,
+    saldoCapitalPendiente: c.saldoCapitalPendiente,
   }));
 
   const totalPaginas = Math.max(1, Math.ceil(totalFiltrado / porPagina));
@@ -99,7 +108,8 @@ export default async function PagosPage({ searchParams }: { searchParams: Promis
   function queryActual(): Record<string, string> {
     const params: Record<string, string> = {};
     if (q) params.q = q;
-    if (metodo !== "todos") params.metodo = metodo;
+    if (tipo !== "todos") params.tipo = tipo;
+    if (metodoPagoId !== "todos") params.metodoPagoId = metodoPagoId;
     if (estado !== "todos") params.estado = estado;
     if (fecha !== "todas") params.fecha = fecha;
     return params;
@@ -121,6 +131,7 @@ export default async function PagosPage({ searchParams }: { searchParams: Promis
         actions={
           <RegistrarPagoPicker
             contratos={contratosParaPicker}
+            metodosPago={metodosPago}
             trigger={
               <DialogTrigger className={buttonVariants()}>
                 <Plus data-icon="inline-start" className="size-4" />
@@ -155,7 +166,7 @@ export default async function PagosPage({ searchParams }: { searchParams: Promis
         />
       </div>
 
-      <PagosFilters basePath="/pagos" valores={{ q, metodo, estado, fecha }} />
+      <PagosFilters basePath="/pagos" valores={{ q, tipo, metodoPagoId, estado, fecha }} metodosPago={metodosPago} />
 
       <Card>
         <CardContent>
@@ -169,6 +180,7 @@ export default async function PagosPage({ searchParams }: { searchParams: Promis
                 <RegistrarPagoPicker
                   key={c.id}
                   contratos={contratosParaPicker}
+                  metodosPago={metodosPago}
                   contratoIdInicial={c.id}
                   trigger={
                     <DialogTrigger
@@ -186,6 +198,7 @@ export default async function PagosPage({ searchParams }: { searchParams: Promis
               ))}
               <RegistrarPagoPicker
                 contratos={contratosParaPicker}
+                metodosPago={metodosPago}
                 trigger={
                   <DialogTrigger
                     className={buttonVariants({

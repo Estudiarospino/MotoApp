@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { fechaDesdeFormulario, pesosPositivosDesdeFormulario, textoOpcional } from "./helpers";
 
+const cuid = z.string().min(1, "Selecciona un contrato");
+
 export const prestamoSchema = z.object({
   clienteId: z.string().min(1, "Selecciona un cliente"),
   fecha: fechaDesdeFormulario,
@@ -30,5 +32,23 @@ export function parseAbonoPrestamoFormData(formData: FormData) {
   return abonoPrestamoSchema.safeParse({
     fecha: formData.get("fecha"),
     monto: formData.get("monto"),
+  });
+}
+
+export const transferenciaCapitalSchema = z.object({
+  contratoId: cuid,
+  fecha: fechaDesdeFormulario,
+  monto: pesosPositivosDesdeFormulario,
+  notas: textoOpcional,
+});
+
+export type TransferenciaCapitalInput = z.infer<typeof transferenciaCapitalSchema>;
+
+export function parseTransferenciaCapitalFormData(formData: FormData) {
+  return transferenciaCapitalSchema.safeParse({
+    contratoId: formData.get("contratoId"),
+    fecha: formData.get("fecha"),
+    monto: formData.get("monto"),
+    notas: formData.get("notas"),
   });
 }

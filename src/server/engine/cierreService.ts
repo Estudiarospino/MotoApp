@@ -24,13 +24,17 @@ export async function bloquearContratoActivo(tx: TxClient, contratoId: string): 
   return contrato;
 }
 
-/** Captura el conjunto exacto de IDs de pagos del periodo abierto — nunca se actualiza por condición genérica. */
+/**
+ * Captura el conjunto exacto de IDs de pagos del periodo abierto — nunca se
+ * actualiza por condición genérica. Solo pagos de tipo ARRIENDO: los abonos
+ * directos a capital se aplican al momento y jamás entran a esta bolsa.
+ */
 export async function capturarPagosAbiertos(
   tx: TxClient,
   contratoId: string,
 ): Promise<{ pagoIds: string[]; cobradoPeriodo: Pesos }> {
   const pagos = await tx.pago.findMany({
-    where: { contratoId, periodoCierreId: null },
+    where: { contratoId, periodoCierreId: null, tipo: "ARRIENDO" },
     select: { id: true, monto: true },
   });
   return { pagoIds: pagos.map((p) => p.id), cobradoPeriodo: sumarPesos(...pagos.map((p) => p.monto)) };
@@ -62,6 +66,7 @@ async function crearPeriodoCierreNormal(
   contrato: Contrato,
   numeroPeriodo: number,
   cobradoPeriodo: Pesos,
+  arriendoFijoUsado: Pesos,
   resultado: ResultadoCierre,
   contratoFinalizado: boolean,
 ) {
@@ -72,7 +77,7 @@ async function crearPeriodoCierreNormal(
       tipoCierre: "NORMAL",
       fechaAperturaPeriodo: contrato.fechaAperturaPeriodoActual,
       moraAnterior: contrato.moraAcumulada,
-      arriendoFijoUsado: contrato.arriendoFijoMensual,
+      arriendoFijoUsado,
       metaArriendo: resultado.metaArriendo,
       cobradoPeriodo,
       arriendoCubierto: resultado.arriendoCubierto,
@@ -86,16 +91,22 @@ async function crearPeriodoCierreNormal(
   return periodoCierre;
 }
 
-/** Cierre normal del periodo abierto: nunca falla por monto insuficiente, solo acumula mora. */
-export async function cerrarPeriodoNormal(contratoId: string): Promise<string> {
+/**
+ * Cierre normal del periodo abierto: nunca falla por monto insuficiente, solo
+ * acumula mora. `arriendoFijoOverride` permite usar un arriendo distinto al
+ * fijo del contrato SOLO para este cierre (acuerdo puntual con el cliente);
+ * el arriendo fijo del contrato no cambia para periodos futuros.
+ */
+export async function cerrarPeriodoNormal(contratoId: string, arriendoFijoOverride?: Pesos): Promise<string> {
   return prisma.$transaction(
     async (tx) => {
       const contrato = await bloquearContratoActivo(tx, contratoId);
       const { pagoIds, cobradoPeriodo } = await capturarPagosAbiertos(tx, contratoId);
       const numeroPeriodo = await siguienteNumeroPeriodo(tx, contratoId);
+      const arriendoFijoUsado = arriendoFijoOverride ?? contrato.arriendoFijoMensual;
 
       const resultado = calcularCierrePeriodo({
-        arriendoFijoMensual: contrato.arriendoFijoMensual,
+        arriendoFijoMensual: arriendoFijoUsado,
         moraAcumulada: contrato.moraAcumulada,
         cobradoPeriodo,
         saldoCapitalPendiente: contrato.saldoCapitalPendiente,
@@ -106,6 +117,7 @@ export async function cerrarPeriodoNormal(contratoId: string): Promise<string> {
         contrato,
         numeroPeriodo,
         cobradoPeriodo,
+        arriendoFijoUsado,
         resultado,
         resultado.contratoFinalizado,
       );
@@ -143,16 +155,19 @@ export async function cerrarPeriodoNormal(contratoId: string): Promise<string> {
  * El dueño marca el contrato como incumplido: se cierra formalmente el
  * periodo abierto (mismo algoritmo, aunque no alcance la meta) para que
  * ningún pago quede huérfano, y la moto vuelve a estar disponible.
+ * `arriendoFijoOverride` permite usar un arriendo distinto al fijo del
+ * contrato SOLO para este cierre (mismo mecanismo que `cerrarPeriodoNormal`).
  */
-export async function cerrarPorIncumplimiento(contratoId: string): Promise<string> {
+export async function cerrarPorIncumplimiento(contratoId: string, arriendoFijoOverride?: Pesos): Promise<string> {
   return prisma.$transaction(
     async (tx) => {
       const contrato = await bloquearContratoActivo(tx, contratoId);
       const { pagoIds, cobradoPeriodo } = await capturarPagosAbiertos(tx, contratoId);
       const numeroPeriodo = await siguienteNumeroPeriodo(tx, contratoId);
+      const arriendoFijoUsado = arriendoFijoOverride ?? contrato.arriendoFijoMensual;
 
       const resultado = calcularCierrePeriodo({
-        arriendoFijoMensual: contrato.arriendoFijoMensual,
+        arriendoFijoMensual: arriendoFijoUsado,
         moraAcumulada: contrato.moraAcumulada,
         cobradoPeriodo,
         saldoCapitalPendiente: contrato.saldoCapitalPendiente,
@@ -163,6 +178,7 @@ export async function cerrarPorIncumplimiento(contratoId: string): Promise<strin
         contrato,
         numeroPeriodo,
         cobradoPeriodo,
+        arriendoFijoUsado,
         resultado,
         true,
       );

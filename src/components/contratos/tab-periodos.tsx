@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { Download, FileText } from "lucide-react";
+import { Download, Eye, FileText } from "lucide-react";
 import { formatCOP } from "@/lib/money";
 import { formatFecha } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PeriodoPagosDialog, type PagoDePeriodo } from "@/components/contratos/periodo-pagos-dialog";
 
 const TIPO_CIERRE_LABEL = {
   NORMAL: "Normal",
@@ -20,6 +22,7 @@ export type PeriodoItem = {
   abonoCapital: number;
   moraNueva: number;
   saldoCapitalNuevo: number;
+  pagos: PagoDePeriodo[];
 };
 
 export function TabPeriodos({ periodos }: { periodos: PeriodoItem[] }) {
@@ -46,14 +49,25 @@ export function TabPeriodos({ periodos }: { periodos: PeriodoItem[] }) {
                     <span className="text-sm font-medium text-foreground">
                       Periodo {periodo.numeroPeriodo} · {TIPO_CIERRE_LABEL[periodo.tipoCierre]}
                     </span>
-                    <Link
-                      href={`/api/recibos/${periodo.id}`}
-                      target="_blank"
-                      aria-label="Descargar recibo"
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      <Download className="size-4" />
-                    </Link>
+                    <div className="flex items-center gap-1">
+                      <PeriodoPagosDialog
+                        numeroPeriodo={periodo.numeroPeriodo}
+                        pagos={periodo.pagos}
+                        trigger={
+                          <DialogTrigger aria-label="Ver pagos del periodo" className="text-muted-foreground hover:text-foreground">
+                            <Eye className="size-4" />
+                          </DialogTrigger>
+                        }
+                      />
+                      <Link
+                        href={`/api/recibos/${periodo.id}`}
+                        target="_blank"
+                        aria-label="Descargar recibo"
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <Download className="size-4" />
+                      </Link>
+                    </div>
                   </div>
                   <p className="mb-2 text-xs text-muted-foreground">Cerrado el {formatFecha(periodo.fechaCierre)}</p>
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm">
@@ -79,7 +93,7 @@ export function TabPeriodos({ periodos }: { periodos: PeriodoItem[] }) {
                     <TableHead>Abono capital</TableHead>
                     <TableHead>Mora nueva</TableHead>
                     <TableHead>Saldo nuevo</TableHead>
-                    <TableHead className="w-10" />
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -93,15 +107,29 @@ export function TabPeriodos({ periodos }: { periodos: PeriodoItem[] }) {
                       <TableCell className="tabular-nums">{formatCOP(periodo.abonoCapital)}</TableCell>
                       <TableCell className="tabular-nums">{formatCOP(periodo.moraNueva)}</TableCell>
                       <TableCell className="tabular-nums">{formatCOP(periodo.saldoCapitalNuevo)}</TableCell>
-                      <TableCell>
-                        <Link
-                          href={`/api/recibos/${periodo.id}`}
-                          target="_blank"
-                          aria-label="Descargar recibo"
-                          className="inline-flex text-muted-foreground hover:text-foreground"
-                        >
-                          <Download className="size-4" />
-                        </Link>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <PeriodoPagosDialog
+                            numeroPeriodo={periodo.numeroPeriodo}
+                            pagos={periodo.pagos}
+                            trigger={
+                              <DialogTrigger
+                                aria-label="Ver pagos del periodo"
+                                className="inline-flex text-muted-foreground hover:text-foreground"
+                              >
+                                <Eye className="size-4" />
+                              </DialogTrigger>
+                            }
+                          />
+                          <Link
+                            href={`/api/recibos/${periodo.id}`}
+                            target="_blank"
+                            aria-label="Descargar recibo"
+                            className="inline-flex text-muted-foreground hover:text-foreground"
+                          >
+                            <Download className="size-4" />
+                          </Link>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

@@ -3,10 +3,9 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/server/auth/session";
 import { formatFecha, formatFolioContrato } from "@/lib/format";
 
-const METODO_LABEL: Record<string, string> = {
-  TRANSFERENCIA: "Transferencia",
-  EFECTIVO: "Efectivo",
-  OTRO: "Otro",
+const TIPO_LABEL: Record<string, string> = {
+  ARRIENDO: "Arriendo",
+  ABONO_CAPITAL: "Abono a capital",
 };
 
 function celdaCsv(valor: string): string {
@@ -26,7 +25,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ con
       folio: true,
       pagos: {
         orderBy: { fecha: "desc" },
-        include: { periodoCierre: { select: { numeroPeriodo: true } } },
+        include: {
+          periodoCierre: { select: { numeroPeriodo: true } },
+          metodoPago: { select: { nombre: true } },
+        },
       },
     },
   });
@@ -35,14 +37,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ con
     return NextResponse.json({ error: "Contrato no encontrado" }, { status: 404 });
   }
 
-  const encabezados = ["Fecha", "Monto", "Método", "Referencia", "Periodo", "Notas"];
+  const encabezados = ["Fecha", "Tipo", "Monto", "Método", "Referencia", "Periodo", "Notas"];
   const filas = contrato.pagos.map((p) =>
     [
       formatFecha(p.fecha),
+      TIPO_LABEL[p.tipo] ?? p.tipo,
       p.monto.toString(),
-      METODO_LABEL[p.metodo] ?? p.metodo,
+      p.metodoPago.nombre,
       p.referencia ?? "",
-      p.periodoCierre ? `Periodo ${p.periodoCierre.numeroPeriodo}` : "Abierto",
+      p.tipo === "ABONO_CAPITAL" ? "—" : p.periodoCierre ? `Periodo ${p.periodoCierre.numeroPeriodo}` : "Abierto",
       p.notas ?? "",
     ]
       .map(celdaCsv)

@@ -40,6 +40,7 @@ export default async function DashboardHomePage() {
     gastosDelMes,
     prestamosActivos,
     ultimosMovimientos,
+    metodosPago,
   ] = await Promise.all([
     getCurrentUser(),
     prisma.contrato.findMany({
@@ -63,6 +64,7 @@ export default async function DashboardHomePage() {
     getGastosDelMes(),
     getPrestamosActivos(),
     getUltimosMovimientos(),
+    prisma.metodoPago.findMany({ where: { activo: true }, orderBy: { nombre: "asc" }, select: { id: true, nombre: true } }),
   ]);
 
   const moraTotal = sumarPesos(...contratosActivos.map((c) => c.moraAcumulada));
@@ -125,7 +127,13 @@ export default async function DashboardHomePage() {
             contratosActivos={contratosActivos
               .slice()
               .sort((a, b) => b.folio - a.folio)
-              .map((c) => ({ id: c.id, folio: c.folio, clienteNombre: c.cliente.nombreCompleto }))}
+              .map((c) => ({
+                id: c.id,
+                folio: c.folio,
+                clienteNombre: c.cliente.nombreCompleto,
+                saldoCapitalPendiente: c.saldoCapitalPendiente,
+              }))}
+            metodosPago={metodosPago}
           />
         </div>
       </div>

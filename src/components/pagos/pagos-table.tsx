@@ -14,29 +14,28 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { EliminarPagoButton } from "@/app/(dashboard)/contratos/eliminar-pago-button";
 import { eliminarPagos } from "@/app/(dashboard)/contratos/pagos-actions";
 
-const METODO_LABEL: Record<string, string> = {
-  TRANSFERENCIA: "Transferencia",
-  EFECTIVO: "Efectivo",
-  OTRO: "Otro",
-};
-
 export type PagoRow = {
   id: string;
+  tipo: string;
   fechaLabel: string;
   contratoId: string;
   folio: number;
   clienteId: string;
   clienteNombre: string;
-  metodo: string;
+  metodoNombre: string;
   monto: number;
   periodoCierreId: string | null;
 };
+
+function esEliminable(pago: PagoRow): boolean {
+  return pago.tipo === "ARRIENDO" && pago.periodoCierreId === null;
+}
 
 export function PagosTable({ pagos, offset }: { pagos: PagoRow[]; offset: number }) {
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
   const [pending, startTransition] = useTransition();
 
-  const eliminables = pagos.filter((p) => p.periodoCierreId === null);
+  const eliminables = pagos.filter(esEliminable);
   const todosSeleccionados = eliminables.length > 0 && eliminables.every((p) => seleccionados.has(p.id));
 
   function alternarTodos() {
@@ -100,8 +99,10 @@ export function PagosTable({ pagos, offset }: { pagos: PagoRow[]; offset: number
                 <span className="font-semibold tabular-nums text-foreground">{formatCOP(pago.monto)}</span>
               </div>
               <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>{METODO_LABEL[pago.metodo] ?? pago.metodo}</span>
-                {pago.periodoCierreId ? (
+                <span>{pago.metodoNombre}</span>
+                {pago.tipo === "ABONO_CAPITAL" ? (
+                  <Badge variant="success">Abono a capital</Badge>
+                ) : pago.periodoCierreId ? (
                   <Link href={`/api/recibos/${pago.periodoCierreId}`} target="_blank" className="text-primary hover:underline">
                     Ver recibo
                   </Link>
@@ -135,6 +136,7 @@ export function PagosTable({ pagos, offset }: { pagos: PagoRow[]; offset: number
               <TableHead>Fecha</TableHead>
               <TableHead>Contrato</TableHead>
               <TableHead>Cliente</TableHead>
+              <TableHead>Tipo</TableHead>
               <TableHead>Método de pago</TableHead>
               <TableHead className="text-right">Monto</TableHead>
               <TableHead>Estado</TableHead>
@@ -145,7 +147,7 @@ export function PagosTable({ pagos, offset }: { pagos: PagoRow[]; offset: number
           <TableBody>
             {pagos.map((pago, i) => {
               const color = colorAvatar(pago.clienteId);
-              const eliminable = pago.periodoCierreId === null;
+              const eliminable = esEliminable(pago);
               return (
                 <TableRow key={pago.id}>
                   <TableCell>
@@ -174,12 +176,19 @@ export function PagosTable({ pagos, offset }: { pagos: PagoRow[]; offset: number
                       <span className="text-foreground">{pago.clienteNombre}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{METODO_LABEL[pago.metodo] ?? pago.metodo}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {pago.tipo === "ABONO_CAPITAL" ? "Abono a capital" : "Arriendo"}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{pago.metodoNombre}</TableCell>
                   <TableCell className="text-right font-medium tabular-nums">{formatCOP(pago.monto)}</TableCell>
                   <TableCell>
-                    <Badge variant={eliminable ? "secondary" : "success"}>
-                      {eliminable ? "Periodo abierto" : "Con recibo"}
-                    </Badge>
+                    {pago.tipo === "ABONO_CAPITAL" ? (
+                      <Badge variant="success">Abono a capital</Badge>
+                    ) : (
+                      <Badge variant={eliminable ? "secondary" : "success"}>
+                        {eliminable ? "Periodo abierto" : "Con recibo"}
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     {pago.periodoCierreId ? (

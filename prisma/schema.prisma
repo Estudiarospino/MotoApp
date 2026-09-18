@@ -110,6 +110,15 @@ enum EstadoContrato {
   INCUMPLIDO_RECUPERADA
 }
 
+/// SOLO informativo (para tener presente cada cuánto paga el cliente) — nunca entra al motor de cierre,
+/// que siempre trabaja con `arriendoFijoMensual` sin importar la frecuencia real de los abonos.
+enum FrecuenciaPago {
+  DIARIO
+  SEMANAL
+  QUINCENAL
+  MENSUAL
+}
+
 model Contrato {
   id    String @id @default(cuid())
   folio Int    @unique @default(autoincrement()) // se formatea en la UI como "CT-0001"
@@ -123,6 +132,7 @@ model Contrato {
   arriendoFijoMensual   Int /// USADO por el motor de cierre
   metaMensualReferencia Int? /// SOLO informativo ("Meta mensual estimada" en la UI) — nunca entra al cálculo
   cuotaDiariaReferencia Int? /// SOLO informativo — nunca entra al cálculo
+  frecuenciaPago        FrecuenciaPago @default(MENSUAL) /// SOLO informativo — nunca entra al cálculo
 
   fechaInicio      DateTime  @db.Date
   fechaFinEstimada DateTime? @db.Date
@@ -138,16 +148,37 @@ model Contrato {
   updatedAt    DateTime  @updatedAt
   finalizadoAt DateTime?
 
-  pagos          Pago[]
-  periodosCierre PeriodoCierre[]
-  gastos         Gasto[]
-  prestamos      Prestamo[]
-  documentos     Documento[]
-  notas          NotaContrato[]
+  pagos                 Pago[]
+  periodosCierre        PeriodoCierre[]
+  gastos                Gasto[]
+  prestamos             Prestamo[]
+  documentos            Documento[]
+  notas                 NotaContrato[]
+  transferenciasCapital TransferenciaPrestamoCapital[]
+  renegociacionComoAnterior RenegociacionContrato? @relation("RenegociacionAnterior")
+  renegociacionComoNuevo    RenegociacionContrato? @relation("RenegociacionNuevo")
 
   @@index([estado])
   @@index([clienteId])
   @@index([motocicletaId])
+}
+
+/// Traza cuando un contrato INCUMPLIDO_RECUPERADA se "renegocia" en un contrato
+/// nuevo: la deuda pendiente del anterior (capital + mora) se suma al valor del
+/// nuevo contrato. El contrato anterior nunca cambia de estado (sigue siendo
+/// incumplido en su propio historial); esto solo deja constancia del vínculo.
+model RenegociacionContrato {
+  id                 String   @id @default(cuid())
+  contratoAnteriorId String   @unique
+  contratoAnterior   Contrato @relation("RenegociacionAnterior", fields: [contratoAnteriorId], references: [id])
+  contratoNuevoId    String   @unique
+  contratoNuevo      Contrato @relation("RenegociacionNuevo", fields: [contratoNuevoId], references: [id])
+
+  deudaTrasladada Int // saldoCapitalPendiente + moraAcumulada del contrato anterior al momento de renegociar
+  fecha           DateTime @db.Date
+  notas           String?
+
+  createdAt DateTime @default(now())
 }
 
 /// Bitácora de seguimiento del contrato (notas internas, orden cronológico, sin edición).
@@ -155,18 +186,62 @@ model NotaContrato {
   id         String   @id @default(cuid())
   contratoId String
   contrato   Contrato @relation(fields: [contratoId], references: [id])
+  /// Si la nota es una corrección sobre un pago puntual (ej. "el monto real era $X, no $Y"),
+  /// queda referenciado aquí. El Pago nunca se edita: esto es solo trazabilidad adicional.
+  pagoId     String?
+  pago       Pago?    @relation(fields: [pagoId], references: [id])
   contenido  String
   createdAt  DateTime @default(now())
 
   @@index([contratoId])
+  @@index([pagoId])
+}
+
+// ==================== CUENTAS Y MÉTODOS DE PAGO (configuración, trazabilidad de dinero) ====================
+
+/// Una cuenta real (bancaria o efectivo) a la que llega el dinero de uno o más métodos de pago.
+/// El saldo "que debe haber" = saldoInicial + pagos recibidos - gastos pagados con métodos de esta cuenta.
+model Cuenta {
+  id           String   @id @default(cuid())
+  nombre       String
+  titular      String
+  banco        String?
+  numeroCuenta String?
+  saldoInicial Int      @default(0)
+  activa       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  metodosPago MetodoPago[]
+
+  @@index([activa])
+}
+
+/// Configurable desde Configuración — reemplaza el enum fijo de antes. Cada método
+/// apunta a la cuenta real donde entra/sale ese dinero.
+model MetodoPago {
+  id        String   @id @default(cuid())
+  nombre    String
+  cuentaId  String
+  cuenta    Cuenta   @relation(fields: [cuentaId], references: [id])
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pagos  Pago[]
+  gastos Gasto[]
+
+  @@index([cuentaId])
+  @@index([activo])
 }
 
 // ==================== PAGO Y PERIODO DE CIERRE (el ledger) ====================
 
-enum MetodoPago {
-  TRANSFERENCIA
-  EFECTIVO
-  OTRO
+enum TipoPago {
+  ARRIENDO
+  /// Abono directo al saldo de capital: se aplica de inmediato (no espera al cierre de periodo)
+  /// y nunca se cuenta dentro de `cobradoPeriodo`. Ver src/server/engine/abonoCapitalService.ts.
+  ABONO_CAPITAL
 }
 
 model Pago {
@@ -176,16 +251,19 @@ model Pago {
   periodoCierreId String? // null = periodo abierto; se fija al cerrar y nunca cambia
   periodoCierre   PeriodoCierre? @relation(fields: [periodoCierreId], references: [id])
 
-  fecha      DateTime   @db.Date // fecha real del pago (puede ser retroactiva)
-  monto      Int
-  metodo     MetodoPago @default(TRANSFERENCIA)
-  referencia String?
-  notas      String?
+  tipo         TipoPago @default(ARRIENDO)
+  fecha        DateTime @db.Date // fecha real del pago (puede ser retroactiva)
+  monto        Int
+  metodoPagoId String
+  metodoPago   MetodoPago @relation(fields: [metodoPagoId], references: [id])
+  referencia   String?
+  notas        String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   documentos Documento[] // comprobante(s), opcional
+  notasCorreccion NotaContrato[]
 
   @@index([contratoId, periodoCierreId])
   @@index([fecha])
@@ -251,6 +329,10 @@ model Gasto {
   descripcion String
   monto       Int
 
+  /// Opcional: de qué cuenta salió este gasto. Nulo en gastos anteriores a esta función.
+  metodoPagoId String?
+  metodoPago   MetodoPago? @relation(fields: [metodoPagoId], references: [id])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -258,6 +340,7 @@ model Gasto {
 
   @@index([motocicletaId])
   @@index([contratoId])
+  @@index([metodoPagoId])
 }
 
 // ==================== PRÉSTAMO (ledger 100% independiente) ====================
@@ -285,8 +368,9 @@ model Prestamo {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  abonos     AbonoPrestamo[]
-  documentos Documento[]
+  abonos               AbonoPrestamo[]
+  documentos           Documento[]
+  transferenciasCapital TransferenciaPrestamoCapital[]
 
   @@index([clienteId])
 }
@@ -304,6 +388,27 @@ model AbonoPrestamo {
   documentos Documento[]
 
   @@index([prestamoId])
+}
+
+/// Traza el traslado de saldo de un Prestamo hacia el capital de un Contrato: no
+/// entra dinero nuevo, se mueve deuda de un ledger a otro. `Prestamo.saldoPendiente`
+/// baja y `Contrato.saldoCapitalPendiente` + `Contrato.valorTotalContrato` suben en
+/// la misma cantidad (ver transferenciaCapitalService.ts). Nunca se edita ni se borra.
+model TransferenciaPrestamoCapital {
+  id         String   @id @default(cuid())
+  prestamoId String
+  prestamo   Prestamo @relation(fields: [prestamoId], references: [id])
+  contratoId String
+  contrato   Contrato @relation(fields: [contratoId], references: [id])
+
+  monto Int
+  fecha DateTime @db.Date
+  notas String?
+
+  createdAt DateTime @default(now())
+
+  @@index([prestamoId])
+  @@index([contratoId])
 }
 
 // ==================== DOCUMENTO (adjuntos genéricos) ====================

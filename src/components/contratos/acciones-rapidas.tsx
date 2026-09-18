@@ -8,12 +8,10 @@ import { cn } from "cn";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DialogTrigger } from "@/components/ui/dialog";
 import { RegistrarPagoDialog } from "@/components/contratos/registrar-pago-dialog";
-import {
-  cerrarPeriodoAction,
-  compraAnticipadaAction,
-  marcarIncumplimientoAction,
-  type AccionCierreState,
-} from "@/app/(dashboard)/contratos/cierre-actions";
+import type { MetodoPagoOpcion } from "@/app/(dashboard)/contratos/pago-form";
+import { CerrarPeriodoDialog } from "@/components/contratos/cerrar-periodo-dialog";
+import { MarcarIncumplidoDialog } from "@/components/contratos/marcar-incumplido-dialog";
+import { compraAnticipadaAction, type AccionCierreState } from "@/app/(dashboard)/contratos/cierre-actions";
 
 const ESTADO_INICIAL: AccionCierreState = {};
 
@@ -108,10 +106,20 @@ export function AccionesRapidas({
   contratoId,
   activo,
   ultimoPeriodoId,
+  saldoCapitalPendiente,
+  arriendoFijoMensual,
+  moraAcumulada,
+  cobradoPeriodo,
+  metodosPago,
 }: {
   contratoId: string;
   activo: boolean;
   ultimoPeriodoId?: string;
+  saldoCapitalPendiente: number;
+  arriendoFijoMensual: number;
+  moraAcumulada: number;
+  cobradoPeriodo: number;
+  metodosPago: MetodoPagoOpcion[];
 }) {
   return (
     <Card>
@@ -125,6 +133,8 @@ export function AccionesRapidas({
         {activo && (
           <RegistrarPagoDialog
             contratoId={contratoId}
+            saldoCapitalPendiente={saldoCapitalPendiente}
+            metodosPago={metodosPago}
             trigger={
               <DialogTrigger className="flex items-center gap-2.5 rounded-lg bg-primary/10 px-2.5 py-2 text-left text-sm font-medium text-foreground hover:bg-primary/15">
                 <Receipt className="size-4 shrink-0 text-primary" />
@@ -136,12 +146,19 @@ export function AccionesRapidas({
         )}
 
         {activo && (
-          <FilaAccion
-            action={cerrarPeriodoAction.bind(null, contratoId)}
-            icono={CircleCheck}
-            etiqueta="Cerrar periodo"
-            etiquetaPendiente="Cerrando..."
-            confirmacion="¿Cerrar el periodo abierto con lo cobrado hasta ahora? Esta acción no se puede deshacer."
+          <CerrarPeriodoDialog
+            contratoId={contratoId}
+            arriendoFijoMensual={arriendoFijoMensual}
+            moraAcumulada={moraAcumulada}
+            cobradoPeriodo={cobradoPeriodo}
+            saldoCapitalPendiente={saldoCapitalPendiente}
+            trigger={
+              <DialogTrigger className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-foreground hover:bg-muted">
+                <CircleCheck className="size-4 shrink-0 text-muted-foreground" />
+                <span className="flex-1 truncate">Cerrar periodo</span>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+              </DialogTrigger>
+            }
           />
         )}
 
@@ -150,13 +167,19 @@ export function AccionesRapidas({
         ) : null}
 
         {activo && (
-          <FilaAccion
-            action={marcarIncumplimientoAction.bind(null, contratoId)}
-            icono={TriangleAlert}
-            etiqueta="Marcar como incumplido"
-            etiquetaPendiente="Procesando..."
-            confirmacion="¿Marcar este contrato como incumplido? Se cerrará el periodo abierto y la moto volverá a estar disponible. Esta acción no se puede deshacer."
-            tono="destructive"
+          <MarcarIncumplidoDialog
+            contratoId={contratoId}
+            arriendoFijoMensual={arriendoFijoMensual}
+            moraAcumulada={moraAcumulada}
+            cobradoPeriodo={cobradoPeriodo}
+            saldoCapitalPendiente={saldoCapitalPendiente}
+            trigger={
+              <DialogTrigger className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-foreground hover:bg-muted">
+                <TriangleAlert className="size-4 shrink-0 text-destructive" />
+                <span className="flex-1 truncate">Marcar como incumplido</span>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+              </DialogTrigger>
+            }
           />
         )}
 

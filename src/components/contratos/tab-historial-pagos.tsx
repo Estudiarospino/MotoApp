@@ -1,28 +1,58 @@
 import Link from "next/link";
-import { Download, Receipt } from "lucide-react";
+import { Download, Receipt, StickyNote } from "lucide-react";
+import { cn } from "cn";
 import { formatCOP } from "@/lib/money";
 import { formatFecha } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
+import { DialogTrigger } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EliminarPagoButton } from "@/app/(dashboard)/contratos/eliminar-pago-button";
-
-const METODO_LABEL: Record<string, string> = {
-  TRANSFERENCIA: "Transferencia",
-  EFECTIVO: "Efectivo",
-  OTRO: "Otro",
-};
+import { NotaCorreccionDialog } from "@/components/contratos/nota-correccion-dialog";
 
 export type PagoHistorialItem = {
   id: string;
+  tipo: string;
   fecha: Date;
   monto: number;
-  metodo: string;
+  metodoNombre: string;
   referencia: string | null;
   periodoCierreId: string | null;
   periodo: { numeroPeriodo: number; arriendoCubierto: number; abonoCapital: number; moraNueva: number } | null;
+  correcciones: number;
 };
+
+function BotonCorreccion({
+  contratoId,
+  pago,
+  className,
+}: {
+  contratoId: string;
+  pago: PagoHistorialItem;
+  className?: string;
+}) {
+  return (
+    <NotaCorreccionDialog
+      contratoId={contratoId}
+      pagoId={pago.id}
+      fechaLabel={formatFecha(pago.fecha)}
+      monto={pago.monto}
+      trigger={
+        <DialogTrigger
+          aria-label={pago.correcciones > 0 ? "Ver/agregar corrección" : "Anotar corrección"}
+          className={cn(
+            "inline-flex text-muted-foreground hover:text-foreground",
+            pago.correcciones > 0 && "text-warning hover:text-warning",
+            className,
+          )}
+        >
+          <StickyNote className="size-4" />
+        </DialogTrigger>
+      }
+    />
+  );
+}
 
 export function TabHistorialPagos({ contratoId, pagos }: { contratoId: string; pagos: PagoHistorialItem[] }) {
   return (
@@ -53,11 +83,16 @@ export function TabHistorialPagos({ contratoId, pagos }: { contratoId: string; p
                 <div key={pago.id} className="rounded-lg border border-border p-3">
                   <div className="mb-1.5 flex items-center justify-between">
                     <span className="text-sm font-medium text-foreground">{formatFecha(pago.fecha)}</span>
-                    <span className="font-semibold tabular-nums text-foreground">{formatCOP(pago.monto)}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold tabular-nums text-foreground">{formatCOP(pago.monto)}</span>
+                      <BotonCorreccion contratoId={contratoId} pago={pago} />
+                    </div>
                   </div>
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{METODO_LABEL[pago.metodo] ?? pago.metodo}</span>
-                    {pago.periodoCierreId ? (
+                    <span>{pago.metodoNombre}</span>
+                    {pago.tipo === "ABONO_CAPITAL" ? (
+                      <Badge variant="success">Abono a capital</Badge>
+                    ) : pago.periodoCierreId ? (
                       <Link href={`/api/recibos/${pago.periodoCierreId}`} target="_blank" className="text-primary hover:underline">
                         Ver recibo
                       </Link>
@@ -109,9 +144,11 @@ export function TabHistorialPagos({ contratoId, pagos }: { contratoId: string; p
                       <TableCell className="tabular-nums text-muted-foreground">
                         {pago.periodo ? formatCOP(pago.periodo.moraNueva) : "—"}
                       </TableCell>
-                      <TableCell>{METODO_LABEL[pago.metodo] ?? pago.metodo}</TableCell>
+                      <TableCell>{pago.metodoNombre}</TableCell>
                       <TableCell>
-                        {pago.periodoCierreId ? (
+                        {pago.tipo === "ABONO_CAPITAL" ? (
+                          <Badge variant="success">Abono a capital</Badge>
+                        ) : pago.periodoCierreId ? (
                           <Link
                             href={`/api/recibos/${pago.periodoCierreId}`}
                             target="_blank"
@@ -125,7 +162,10 @@ export function TabHistorialPagos({ contratoId, pagos }: { contratoId: string; p
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        {!pago.periodoCierreId && <EliminarPagoButton pagoId={pago.id} />}
+                        <div className="flex items-center justify-end gap-1">
+                          <BotonCorreccion contratoId={contratoId} pago={pago} />
+                          {pago.tipo === "ARRIENDO" && !pago.periodoCierreId && <EliminarPagoButton pagoId={pago.id} />}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

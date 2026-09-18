@@ -35,12 +35,6 @@ import { ClienteMoreMenu } from "@/components/clientes/cliente-more-menu";
 import { MobilePageHeader } from "@/components/dashboard/mobile-page-header";
 import { toggleActivoCliente } from "../actions";
 
-const METODO_LABEL: Record<string, string> = {
-  TRANSFERENCIA: "Transferencia",
-  EFECTIVO: "Efectivo",
-  OTRO: "Otro",
-};
-
 function InfoRow({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-start gap-3">
@@ -69,7 +63,7 @@ export default async function ClienteDetallePage({
         orderBy: { createdAt: "desc" },
         include: {
           motocicleta: { select: { placa: true, marca: true, modelo: true } },
-          pagos: { orderBy: { fecha: "desc" } },
+          pagos: { orderBy: { fecha: "desc" }, include: { metodoPago: { select: { nombre: true } } } },
         },
       },
       prestamos: { orderBy: { createdAt: "desc" } },
@@ -300,7 +294,7 @@ export default async function ClienteDetallePage({
                     <TableRow key={pago.id}>
                       <TableCell>{formatFecha(pago.fecha)}</TableCell>
                       <TableCell>{formatFolioContrato(pago.folio)}</TableCell>
-                      <TableCell className="hidden sm:table-cell">{METODO_LABEL[pago.metodo] ?? pago.metodo}</TableCell>
+                      <TableCell className="hidden sm:table-cell">{pago.metodoPago.nombre}</TableCell>
                       <TableCell className="text-right font-medium tabular-nums">{formatCOP(pago.monto)}</TableCell>
                     </TableRow>
                   ))}

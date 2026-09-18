@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import {
+  ArrowRightLeft,
   BadgeDollarSign,
   Bike,
   Calendar,
@@ -35,6 +36,7 @@ import { MobilePageHeader } from "@/components/dashboard/mobile-page-header";
 import { ContratoHeaderActions } from "@/components/contratos/contrato-header-actions";
 import { ContratoMoreMenu } from "@/components/contratos/contrato-more-menu";
 import { RegistrarPagoDialog } from "@/components/contratos/registrar-pago-dialog";
+import { CerrarPeriodoDialog } from "@/components/contratos/cerrar-periodo-dialog";
 import { AccionesRapidas } from "@/components/contratos/acciones-rapidas";
 import { TabHistorialPagos } from "@/components/contratos/tab-historial-pagos";
 import { TabPeriodos } from "@/components/contratos/tab-periodos";
@@ -49,6 +51,13 @@ const CATEGORIA_GASTO_LABEL = {
   IMPUESTOS: "Impuestos",
   OTRO: "Otro",
 } as const;
+
+const FRECUENCIA_LABEL: Record<string, string> = {
+  DIARIO: "Diario",
+  SEMANAL: "Semanal",
+  QUINCENAL: "Quincenal",
+  MENSUAL: "Mensual",
+};
 
 const formatoMesAnio = new Intl.DateTimeFormat("es-CO", { month: "short", year: "numeric", timeZone: "UTC" });
 function capitalizar(texto: string): string {
@@ -79,11 +88,22 @@ export default async function ContratoDetallePage({
           periodoCierre: {
             select: { numeroPeriodo: true, arriendoCubierto: true, abonoCapital: true, moraNueva: true },
           },
+          metodoPago: { select: { nombre: true } },
+          _count: { select: { notasCorreccion: true } },
         },
       },
       periodosCierre: { orderBy: { numeroPeriodo: "desc" } },
       documentos: { orderBy: { createdAt: "desc" } },
-      notas: { orderBy: { createdAt: "desc" } },
+      notas: {
+        orderBy: { createdAt: "desc" },
+        include: { pago: { select: { id: true, fecha: true, monto: true } } },
+      },
+      transferenciasCapital: {
+        orderBy: { fecha: "desc" },
+        include: { prestamo: { select: { id: true, motivo: true } } },
+      },
+      renegociacionComoAnterior: { include: { contratoNuevo: { select: { id: true, folio: true } } } },
+      renegociacionComoNuevo: { include: { contratoAnterior: { select: { id: true, folio: true } } } },
     },
   });
 
@@ -91,19 +111,30 @@ export default async function ContratoDetallePage({
     notFound();
   }
 
-  const [gastosMoto, prestamosCliente] = await Promise.all([
+  const [gastosMoto, prestamosCliente, metodosPago] = await Promise.all([
     prisma.gasto.findMany({ where: { motocicletaId: contrato.motocicletaId }, orderBy: { fecha: "desc" } }),
     prisma.prestamo.findMany({ where: { clienteId: contrato.clienteId }, orderBy: { fecha: "desc" } }),
+    prisma.metodoPago.findMany({ where: { activo: true }, orderBy: { nombre: "asc" }, select: { id: true, nombre: true } }),
   ]);
 
   const valoresInicialesTerminos = {
     arriendoFijoMensual: contrato.arriendoFijoMensual.toString(),
     metaMensualReferencia: contrato.metaMensualReferencia?.toString(),
     cuotaDiariaReferencia: contrato.cuotaDiariaReferencia?.toString(),
+    frecuenciaPago: contrato.frecuenciaPago,
     fechaFinEstimada: contrato.fechaFinEstimada ? toFechaInputValue(contrato.fechaFinEstimada) : undefined,
   };
-  const pagosAbiertos = contrato.pagos.filter((p) => p.periodoCierreId === null);
+  const pagosAbiertos = contrato.pagos.filter((p) => p.periodoCierreId === null && p.tipo === "ARRIENDO");
   const cobradoPeriodo = sumarPesos(...pagosAbiertos.map((p) => p.monto));
+  const abonosCapitalDirectos = contrato.pagos.filter((p) => p.tipo === "ABONO_CAPITAL");
+
+  const pagosPorPeriodo = new Map<string, { id: string; fecha: Date; monto: number; metodoNombre: string }[]>();
+  for (const pago of contrato.pagos) {
+    if (!pago.periodoCierreId) continue;
+    const lista = pagosPorPeriodo.get(pago.periodoCierreId) ?? [];
+    lista.push({ id: pago.id, fecha: pago.fecha, monto: pago.monto, metodoNombre: pago.metodoPago.nombre });
+    pagosPorPeriodo.set(pago.periodoCierreId, lista);
+  }
   const metaArriendo = sumarPesos(contrato.arriendoFijoMensual, contrato.moraAcumulada);
   const pctCobrado = metaArriendo > 0 ? Math.min(100, Math.round((cobradoPeriodo / metaArriendo) * 100)) : 0;
   const faltaPorPagar = Math.max(metaArriendo - cobradoPeriodo, 0);
@@ -118,8 +149,12 @@ export default async function ContratoDetallePage({
   const totalRecaudadoHistorico = sumarPesos(
     ...contrato.periodosCierre.map((p) => p.cobradoPeriodo),
     cobradoPeriodo,
+    ...abonosCapitalDirectos.map((p) => p.monto),
   );
-  const totalAbonadoCapitalHistorico = sumarPesos(...contrato.periodosCierre.map((p) => p.abonoCapital));
+  const totalAbonadoCapitalHistorico = sumarPesos(
+    ...contrato.periodosCierre.map((p) => p.abonoCapital),
+    ...abonosCapitalDirectos.map((p) => p.monto),
+  );
   const ultimoPeriodoCerrado = contrato.periodosCierre[0];
 
   return (
@@ -144,6 +179,15 @@ export default async function ContratoDetallePage({
             <Badge variant={estado.variant}>{estado.label}</Badge>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">Arrendamiento con opción de compra</p>
+          {contrato.renegociacionComoNuevo && (
+            <Link
+              href={`/contratos/${contrato.renegociacionComoNuevo.contratoAnterior.id}`}
+              className="mt-1 flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+            >
+              <ArrowRightLeft className="size-3.5" />
+              Viene de renegociar {formatFolioContrato(contrato.renegociacionComoNuevo.contratoAnterior.folio)}
+            </Link>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -152,6 +196,8 @@ export default async function ContratoDetallePage({
             <>
               <RegistrarPagoDialog
                 contratoId={contrato.id}
+                saldoCapitalPendiente={contrato.saldoCapitalPendiente}
+                metodosPago={metodosPago}
                 trigger={
                   <DialogTrigger className={buttonVariants({ className: "print:hidden" })}>
                     <Plus data-icon="inline-start" className="size-4" />
@@ -263,7 +309,11 @@ export default async function ContratoDetallePage({
               <CampoIcono icono={CalendarDays} etiqueta="Fecha de inicio" valor={formatFechaLarga(contrato.fechaInicio)} />
               <CampoIcono icono={BadgeDollarSign} etiqueta="Precio de la moto" valor={formatCOP(contrato.valorTotalContrato)} />
               <CampoIcono icono={Landmark} etiqueta="Arriendo por periodo" valor={formatCOP(contrato.arriendoFijoMensual)} />
-              <CampoIcono icono={Repeat} etiqueta="Tipo de pago" valor="Flexible" />
+              <CampoIcono
+                icono={Repeat}
+                etiqueta="Periodo de pago"
+                valor={FRECUENCIA_LABEL[contrato.frecuenciaPago] ?? contrato.frecuenciaPago}
+              />
               <div className="flex items-center justify-between gap-3">
                 <span className="flex items-center gap-2.5 text-muted-foreground">
                   <IdCard className="size-4 text-primary" />
@@ -349,18 +399,45 @@ export default async function ContratoDetallePage({
                     <ProgressIndicator />
                   </ProgressTrack>
                 </Progress>
-                <a
-                  href="#acciones-rapidas"
-                  className="mt-auto flex h-10 items-center justify-center gap-1.5 rounded-lg border border-primary/25 bg-primary/[0.04] text-sm font-semibold text-primary transition-colors hover:bg-primary/10 print:hidden"
-                >
-                  Cerrar periodo
-                  <ChevronRight className="size-4" />
-                </a>
+                <CerrarPeriodoDialog
+                  contratoId={contrato.id}
+                  arriendoFijoMensual={contrato.arriendoFijoMensual}
+                  moraAcumulada={contrato.moraAcumulada}
+                  cobradoPeriodo={cobradoPeriodo}
+                  saldoCapitalPendiente={contrato.saldoCapitalPendiente}
+                  trigger={
+                    <DialogTrigger className="mt-auto flex h-10 items-center justify-center gap-1.5 rounded-lg border border-primary/25 bg-primary/[0.04] text-sm font-semibold text-primary transition-colors hover:bg-primary/10 print:hidden">
+                      Cerrar periodo
+                      <ChevronRight className="size-4" />
+                    </DialogTrigger>
+                  }
+                />
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                {contrato.finalizadoAt ? `Finalizado el ${formatFechaLarga(contrato.finalizadoAt)}.` : "Este contrato ya no está activo."}
-              </p>
+              <div className="flex flex-col gap-3">
+                <p className="text-sm text-muted-foreground">
+                  {contrato.finalizadoAt ? `Finalizado el ${formatFechaLarga(contrato.finalizadoAt)}.` : "Este contrato ya no está activo."}
+                </p>
+
+                {contrato.estado === "INCUMPLIDO_RECUPERADA" &&
+                  (contrato.renegociacionComoAnterior ? (
+                    <Link
+                      href={`/contratos/${contrato.renegociacionComoAnterior.contratoNuevo.id}`}
+                      className="flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+                    >
+                      <ArrowRightLeft className="size-3.5" />
+                      Renegociado en {formatFolioContrato(contrato.renegociacionComoAnterior.contratoNuevo.folio)}
+                    </Link>
+                  ) : (
+                    <Link
+                      href={`/contratos/nuevo?renegociarDe=${contrato.id}`}
+                      className={buttonVariants({ variant: "outline", size: "sm", className: "print:hidden" })}
+                    >
+                      <ArrowRightLeft data-icon="inline-start" className="size-4" />
+                      Renegociar contrato
+                    </Link>
+                  ))}
+              </div>
             )}
           </CardContent>
         </Card>
@@ -420,18 +497,25 @@ export default async function ContratoDetallePage({
                 contratoId={contrato.id}
                 pagos={contrato.pagos.map((p) => ({
                   id: p.id,
+                  tipo: p.tipo,
                   fecha: p.fecha,
                   monto: p.monto,
-                  metodo: p.metodo,
+                  metodoNombre: p.metodoPago.nombre,
                   referencia: p.referencia,
                   periodoCierreId: p.periodoCierreId,
                   periodo: p.periodoCierre,
+                  correcciones: p._count.notasCorreccion,
                 }))}
               />
             </TabsContent>
 
             <TabsContent value="periodos" className="pt-4">
-              <TabPeriodos periodos={contrato.periodosCierre} />
+              <TabPeriodos
+                periodos={contrato.periodosCierre.map((periodo) => ({
+                  ...periodo,
+                  pagos: pagosPorPeriodo.get(periodo.id) ?? [],
+                }))}
+              />
             </TabsContent>
 
             <TabsContent value="resumen" className="pt-4">
@@ -441,6 +525,13 @@ export default async function ContratoDetallePage({
                 periodosCerrados={contrato.periodosCierre.length}
                 saldoCapitalPendiente={contrato.saldoCapitalPendiente}
                 moraAcumulada={contrato.moraAcumulada}
+                transferenciasCapital={contrato.transferenciasCapital.map((t) => ({
+                  id: t.id,
+                  monto: t.monto,
+                  fecha: t.fecha,
+                  notas: t.notas,
+                  prestamoId: t.prestamo.id,
+                }))}
               />
             </TabsContent>
 
@@ -466,6 +557,7 @@ export default async function ContratoDetallePage({
                   id: n.id,
                   contenido: n.contenido,
                   createdAt: formatFecha(n.createdAt),
+                  pago: n.pago ? { fecha: formatFecha(n.pago.fecha), monto: n.pago.monto } : null,
                 }))}
               />
             </TabsContent>
@@ -474,7 +566,16 @@ export default async function ContratoDetallePage({
 
         {/* Barra lateral */}
         <div className="flex flex-col gap-6 print:hidden" id="acciones-rapidas">
-          <AccionesRapidas contratoId={contrato.id} activo={activo} ultimoPeriodoId={ultimoPeriodoCerrado?.id} />
+          <AccionesRapidas
+            contratoId={contrato.id}
+            activo={activo}
+            ultimoPeriodoId={ultimoPeriodoCerrado?.id}
+            saldoCapitalPendiente={contrato.saldoCapitalPendiente}
+            arriendoFijoMensual={contrato.arriendoFijoMensual}
+            moraAcumulada={contrato.moraAcumulada}
+            cobradoPeriodo={cobradoPeriodo}
+            metodosPago={metodosPago}
+          />
 
           {gastosMoto.length > 0 && (
             <Card>

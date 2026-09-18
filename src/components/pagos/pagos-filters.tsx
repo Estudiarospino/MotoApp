@@ -10,16 +10,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 export type PagosFiltrosValor = {
   q: string;
-  metodo: string;
+  tipo: string;
+  metodoPagoId: string;
   estado: string;
   fecha: string;
 };
 
-const METODO_OPCIONES = [
+const TIPO_OPCIONES = [
   { value: "todos", label: "Todos" },
-  { value: "TRANSFERENCIA", label: "Transferencia" },
-  { value: "EFECTIVO", label: "Efectivo" },
-  { value: "OTRO", label: "Otro" },
+  { value: "ARRIENDO", label: "Arriendo" },
+  { value: "ABONO_CAPITAL", label: "Abono a capital" },
 ];
 
 const ESTADO_OPCIONES = [
@@ -35,19 +35,36 @@ const FECHA_OPCIONES = [
   { value: "este_anio", label: "Este año" },
 ];
 
-const VALORES_DEFECTO: PagosFiltrosValor = { q: "", metodo: "todos", estado: "todos", fecha: "todas" };
+const VALORES_DEFECTO: PagosFiltrosValor = {
+  q: "",
+  tipo: "todos",
+  metodoPagoId: "todos",
+  estado: "todos",
+  fecha: "todas",
+};
 
-export function PagosFilters({ basePath, valores }: { basePath: string; valores: PagosFiltrosValor }) {
+export function PagosFilters({
+  basePath,
+  valores,
+  metodosPago,
+}: {
+  basePath: string;
+  valores: PagosFiltrosValor;
+  metodosPago: { id: string; nombre: string }[];
+}) {
   const router = useRouter();
   const [q, setQ] = useState(valores.q);
   const [masFiltrosMovil, setMasFiltrosMovil] = useState(false);
   const primerRender = useRef(true);
 
+  const metodoOpciones = [{ value: "todos", label: "Todos" }, ...metodosPago.map((m) => ({ value: m.id, label: m.nombre }))];
+
   function navegar(cambios: Partial<PagosFiltrosValor>) {
     const siguiente = { ...valores, q, ...cambios };
     const params = new URLSearchParams();
     if (siguiente.q) params.set("q", siguiente.q);
-    if (siguiente.metodo !== "todos") params.set("metodo", siguiente.metodo);
+    if (siguiente.tipo !== "todos") params.set("tipo", siguiente.tipo);
+    if (siguiente.metodoPagoId !== "todos") params.set("metodoPagoId", siguiente.metodoPagoId);
     if (siguiente.estado !== "todos") params.set("estado", siguiente.estado);
     if (siguiente.fecha !== "todas") params.set("fecha", siguiente.fecha);
     const query = params.toString();
@@ -65,7 +82,11 @@ export function PagosFilters({ basePath, valores }: { basePath: string; valores:
   }, [q]);
 
   const hayFiltrosActivos =
-    valores.q !== "" || valores.metodo !== "todos" || valores.estado !== "todos" || valores.fecha !== "todas";
+    valores.q !== "" ||
+    valores.tipo !== "todos" ||
+    valores.metodoPagoId !== "todos" ||
+    valores.estado !== "todos" ||
+    valores.fecha !== "todas";
 
   return (
     <div className="flex flex-col gap-3">
@@ -98,6 +119,21 @@ export function PagosFilters({ basePath, valores }: { basePath: string; valores:
           <div className="flex flex-col gap-2">
             <div className="grid grid-cols-2 gap-2">
               <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">Tipo</span>
+                <Select value={valores.tipo} onValueChange={(v) => navegar({ tipo: v as string })}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIPO_OPCIONES.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1">
                 <span className="text-xs text-muted-foreground">Fecha</span>
                 <Select value={valores.fecha} onValueChange={(v) => navegar({ fecha: v as string })}>
                   <SelectTrigger className="w-full">
@@ -114,12 +150,12 @@ export function PagosFilters({ basePath, valores }: { basePath: string; valores:
               </div>
               <div className="flex flex-col gap-1">
                 <span className="text-xs text-muted-foreground">Método de pago</span>
-                <Select value={valores.metodo} onValueChange={(v) => navegar({ metodo: v as string })}>
+                <Select value={valores.metodoPagoId} onValueChange={(v) => navegar({ metodoPagoId: v as string })}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {METODO_OPCIONES.map((o) => (
+                    {metodoOpciones.map((o) => (
                       <SelectItem key={o.value} value={o.value}>
                         {o.label}
                       </SelectItem>
@@ -127,9 +163,7 @@ export function PagosFilters({ basePath, valores }: { basePath: string; valores:
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            <div className="flex items-end gap-2">
-              <div className="flex flex-1 flex-col gap-1">
+              <div className="flex flex-col gap-1">
                 <span className="text-xs text-muted-foreground">Estado</span>
                 <Select value={valores.estado} onValueChange={(v) => navegar({ estado: v as string })}>
                   <SelectTrigger className="w-full">
@@ -144,20 +178,20 @@ export function PagosFilters({ basePath, valores }: { basePath: string; valores:
                   </SelectContent>
                 </Select>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                disabled={!hayFiltrosActivos}
-                onClick={() => {
-                  setQ(VALORES_DEFECTO.q);
-                  router.push(basePath);
-                }}
-                aria-label="Limpiar filtros"
-              >
-                <FilterX className="size-4" />
-              </Button>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!hayFiltrosActivos}
+              onClick={() => {
+                setQ(VALORES_DEFECTO.q);
+                router.push(basePath);
+              }}
+            >
+              <FilterX data-icon="inline-start" className="size-4" />
+              Limpiar filtros
+            </Button>
           </div>
         )}
       </div>
@@ -172,6 +206,22 @@ export function PagosFilters({ basePath, valores }: { basePath: string; valores:
             placeholder="Buscar por cliente, contrato o referencia..."
             className="pl-9"
           />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground">Tipo</span>
+          <Select value={valores.tipo} onValueChange={(v) => navegar({ tipo: v as string })}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TIPO_OPCIONES.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex flex-col gap-1">
@@ -192,12 +242,12 @@ export function PagosFilters({ basePath, valores }: { basePath: string; valores:
 
         <div className="flex flex-col gap-1">
           <span className="text-xs text-muted-foreground">Método de pago</span>
-          <Select value={valores.metodo} onValueChange={(v) => navegar({ metodo: v as string })}>
+          <Select value={valores.metodoPagoId} onValueChange={(v) => navegar({ metodoPagoId: v as string })}>
             <SelectTrigger className="w-40">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {METODO_OPCIONES.map((o) => (
+              {metodoOpciones.map((o) => (
                 <SelectItem key={o.value} value={o.value}>
                   {o.label}
                 </SelectItem>
