@@ -87,6 +87,12 @@ model Motocicleta {
   estado        EstadoMoto @default(DISPONIBLE)
   fotoUrl       String?
   notas         String?
+
+  /// Fecha de expedición — el vencimiento se calcula (ver src/lib/moto-documentos.ts), nunca se guarda.
+  soatFechaExpedicion          DateTime? @db.Date
+  /// Fecha de expedición — el vencimiento se calcula (ver src/lib/moto-documentos.ts), nunca se guarda.
+  tecnomecanicaFechaExpedicion DateTime? @db.Date
+
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 

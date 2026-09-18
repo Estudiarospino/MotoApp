@@ -1,10 +1,22 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Archive, Bike, CheckCircle2, ChevronLeft, ChevronRight, Eye, FileText, Pencil, Plus } from "lucide-react";
+import {
+  AlertTriangle,
+  Archive,
+  Bike,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  FileText,
+  Pencil,
+  Plus,
+} from "lucide-react";
 import { prisma } from "@/lib/db";
 import { formatCOP } from "@/lib/money";
 import { formatFolioContrato } from "@/lib/format";
 import { construirFiltroMotos, type MotosSearchParams } from "@/lib/motos-filtro";
+import { motoNecesitaAtencionDocumentos } from "@/lib/moto-documentos";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -137,6 +149,7 @@ export default async function MotosPage({
           <div className="flex flex-col gap-1 sm:hidden">
             {motos.map((moto) => {
               const contratoActivo = moto.contratos[0];
+              const alertaDocumentos = motoNecesitaAtencionDocumentos(moto);
               return (
                 <Link
                   key={moto.id}
@@ -151,7 +164,15 @@ export default async function MotosPage({
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-foreground">{moto.placa}</p>
+                    <p className="flex items-center gap-1.5 truncate font-medium text-foreground">
+                      {moto.placa}
+                      {alertaDocumentos && (
+                        <AlertTriangle
+                          className="size-3.5 shrink-0 text-warning"
+                          aria-label="SOAT o tecnomecánica vencidos o por vencer"
+                        />
+                      )}
+                    </p>
                     <p className="truncate text-xs text-muted-foreground">
                       {moto.marca} {moto.modelo}
                     </p>
@@ -188,6 +209,7 @@ export default async function MotosPage({
               <TableBody>
                 {motos.map((moto, i) => {
                   const contratoActivo = moto.contratos[0];
+                  const alertaDocumentos = motoNecesitaAtencionDocumentos(moto);
                   return (
                     <TableRow key={moto.id}>
                       <TableCell className="text-muted-foreground">{(pagina - 1) * porPagina + i + 1}</TableCell>
@@ -200,7 +222,17 @@ export default async function MotosPage({
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="font-medium">{moto.placa}</TableCell>
+                      <TableCell className="font-medium">
+                        <span className="flex items-center gap-1.5">
+                          {moto.placa}
+                          {alertaDocumentos && (
+                            <AlertTriangle
+                              className="size-3.5 shrink-0 text-warning"
+                              aria-label="SOAT o tecnomecánica vencidos o por vencer"
+                            />
+                          )}
+                        </span>
+                      </TableCell>
                       <TableCell>
                         <p className="text-foreground">
                           {moto.marca} {moto.modelo}

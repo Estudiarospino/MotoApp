@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FormFieldError } from "@/components/form-field-error";
+import { formatFecha } from "@/lib/format";
+import { calcularVencimiento, VIGENCIA_SOAT_MESES, VIGENCIA_TECNOMECANICA_MESES } from "@/lib/moto-documentos";
 import type { MotocicletaFormState } from "./actions";
 
 const ESTADO_INICIAL: MotocicletaFormState = {};
@@ -60,6 +62,43 @@ function FotoInput({ fotoActualUrl }: { fotoActualUrl?: string }) {
   );
 }
 
+/** Input de fecha de expedición que muestra en vivo el vencimiento calculado. */
+function FechaExpedicionInput({
+  id,
+  name,
+  label,
+  defaultValue,
+  meses,
+  error,
+}: {
+  id: string;
+  name: string;
+  label: string;
+  defaultValue?: string;
+  meses: number;
+  error?: string[];
+}) {
+  const [fecha, setFecha] = useState(defaultValue ?? "");
+  const vencimiento = fecha ? calcularVencimiento(new Date(`${fecha}T00:00:00Z`), meses) : null;
+
+  return (
+    <div className="flex flex-col gap-1">
+      <Label htmlFor={id}>{label}</Label>
+      <Input
+        id={id}
+        name={name}
+        type="date"
+        defaultValue={defaultValue}
+        onChange={(e) => setFecha(e.target.value)}
+      />
+      <p className="text-xs text-muted-foreground">
+        {vencimiento ? `Vence: ${formatFecha(vencimiento)}` : "Sin fecha registrada"}
+      </p>
+      <FormFieldError mensajes={error} />
+    </div>
+  );
+}
+
 export function MotoForm({
   action,
   valoresIniciales,
@@ -72,6 +111,8 @@ export function MotoForm({
     color?: string;
     anioModelo?: string;
     precioInicial?: string;
+    soatFechaExpedicion?: string;
+    tecnomecanicaFechaExpedicion?: string;
     notas?: string;
     fotoUrl?: string;
   };
@@ -137,6 +178,26 @@ export function MotoForm({
           />
           <FormFieldError mensajes={state.fieldErrors?.precioInicial} />
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <FechaExpedicionInput
+          id="soatFechaExpedicion"
+          name="soatFechaExpedicion"
+          label="Fecha de expedición del SOAT"
+          defaultValue={valoresIniciales?.soatFechaExpedicion}
+          meses={VIGENCIA_SOAT_MESES}
+          error={state.fieldErrors?.soatFechaExpedicion}
+        />
+
+        <FechaExpedicionInput
+          id="tecnomecanicaFechaExpedicion"
+          name="tecnomecanicaFechaExpedicion"
+          label="Fecha de expedición de la tecnomecánica"
+          defaultValue={valoresIniciales?.tecnomecanicaFechaExpedicion}
+          meses={VIGENCIA_TECNOMECANICA_MESES}
+          error={state.fieldErrors?.tecnomecanicaFechaExpedicion}
+        />
       </div>
 
       <div className="flex flex-col gap-1">

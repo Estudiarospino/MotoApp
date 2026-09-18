@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { pesosPositivosDesdeFormulario, textoOpcional } from "./helpers";
+import { fechaOpcionalDesdeFormulario, pesosPositivosDesdeFormulario, textoOpcional } from "./helpers";
 
 export const motocicletaSchema = z.object({
   marca: z.string().trim().min(1, "Ingresa la marca"),
@@ -15,6 +15,8 @@ export const motocicletaSchema = z.object({
     z.coerce.number().int().min(1990).max(2100).optional(),
   ),
   precioInicial: pesosPositivosDesdeFormulario,
+  soatFechaExpedicion: fechaOpcionalDesdeFormulario,
+  tecnomecanicaFechaExpedicion: fechaOpcionalDesdeFormulario,
   notas: textoOpcional,
 });
 
@@ -28,6 +30,8 @@ export function parseMotocicletaFormData(formData: FormData) {
     color: formData.get("color"),
     anioModelo: formData.get("anioModelo"),
     precioInicial: formData.get("precioInicial"),
+    soatFechaExpedicion: formData.get("soatFechaExpedicion"),
+    tecnomecanicaFechaExpedicion: formData.get("tecnomecanicaFechaExpedicion"),
     notas: formData.get("notas"),
   });
 }

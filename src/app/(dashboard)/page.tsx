@@ -24,6 +24,7 @@ import { RecentActivity } from "@/components/dashboard/recent-activity";
 import { FleetStatus } from "@/components/dashboard/fleet-status";
 import { ExpensesSummary } from "@/components/dashboard/expenses-summary";
 import { ActiveLoans } from "@/components/dashboard/active-loans";
+import { VehicleDocsAttention } from "@/components/dashboard/vehicle-docs-attention";
 
 export default async function DashboardHomePage() {
   const [
@@ -31,6 +32,7 @@ export default async function DashboardHomePage() {
     contratosActivos,
     totalContratos,
     motos,
+    motosDocumentos,
     resumenFinanciero,
     tendenciaContratos,
     tendenciaMora,
@@ -50,6 +52,10 @@ export default async function DashboardHomePage() {
     }),
     prisma.contrato.count(),
     prisma.motocicleta.findMany({ select: { estado: true } }),
+    prisma.motocicleta.findMany({
+      where: { estado: { in: ["DISPONIBLE", "EN_CONTRATO"] } },
+      select: { id: true, placa: true, soatFechaExpedicion: true, tecnomecanicaFechaExpedicion: true },
+    }),
     getResumenFinanciero(),
     getTendenciaContratosNuevos(),
     getTendenciaMoraGenerada(),
@@ -128,10 +134,11 @@ export default async function DashboardHomePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
         <FleetStatus items={estadoFlota} />
         <ExpensesSummary items={gastosDelMes.items} total={gastosDelMes.total} />
         <ActiveLoans items={prestamosActivos.items} totalPendiente={prestamosActivos.totalPendiente} />
+        <VehicleDocsAttention motos={motosDocumentos} />
       </div>
     </div>
   );

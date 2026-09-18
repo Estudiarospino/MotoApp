@@ -4,8 +4,14 @@ import { ChevronRight, Plus, Trash2, Wrench } from "lucide-react";
 import { MobilePageHeader } from "@/components/dashboard/mobile-page-header";
 import { prisma } from "@/lib/db";
 import { formatCOP, restarPesos, sumarPesos } from "@/lib/money";
-import { formatFecha } from "@/lib/format";
+import { formatFecha, toFechaInputValue } from "@/lib/format";
+import {
+  estadoVencimiento,
+  VIGENCIA_SOAT_MESES,
+  VIGENCIA_TECNOMECANICA_MESES,
+} from "@/lib/moto-documentos";
 import { buttonVariants, Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatCard } from "@/components/stat-card";
 import {
@@ -48,6 +54,8 @@ export default async function EditarMotoPage({
   }
 
   const actionConId = updateMotocicleta.bind(null, moto.id);
+  const estadoSoat = estadoVencimiento(moto.soatFechaExpedicion, VIGENCIA_SOAT_MESES);
+  const estadoTecnomecanica = estadoVencimiento(moto.tecnomecanicaFechaExpedicion, VIGENCIA_TECNOMECANICA_MESES);
   const totalGastos = sumarPesos(...gastos.map((g) => g.monto));
   const totalCobrado = sumarPesos(
     ...periodosCierre.map((p) => sumarPesos(p.arriendoCubierto, p.abonoCapital)),
@@ -81,10 +89,42 @@ export default async function EditarMotoPage({
             color: moto.color ?? undefined,
             anioModelo: moto.anioModelo?.toString(),
             precioInicial: moto.precioInicial.toString(),
+            soatFechaExpedicion: moto.soatFechaExpedicion ? toFechaInputValue(moto.soatFechaExpedicion) : undefined,
+            tecnomecanicaFechaExpedicion: moto.tecnomecanicaFechaExpedicion
+              ? toFechaInputValue(moto.tecnomecanicaFechaExpedicion)
+              : undefined,
             notas: moto.notas ?? undefined,
             fotoUrl: moto.fotoUrl ?? undefined,
           }}
         />
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <h2 className="text-lg font-medium text-foreground">Documentos legales</h2>
+        <Card>
+          <CardContent className="grid grid-cols-2 gap-6">
+            <div className="flex flex-col gap-1">
+              <p className="text-sm text-muted-foreground">SOAT</p>
+              <Badge variant={estadoSoat.variant} className="w-fit">
+                {estadoSoat.label}
+              </Badge>
+              {estadoSoat.vencimiento && (
+                <p className="text-xs text-muted-foreground">Vence: {formatFecha(estadoSoat.vencimiento)}</p>
+              )}
+            </div>
+            <div className="flex flex-col gap-1">
+              <p className="text-sm text-muted-foreground">Revisión tecnomecánica</p>
+              <Badge variant={estadoTecnomecanica.variant} className="w-fit">
+                {estadoTecnomecanica.label}
+              </Badge>
+              {estadoTecnomecanica.vencimiento && (
+                <p className="text-xs text-muted-foreground">
+                  Vence: {formatFecha(estadoTecnomecanica.vencimiento)}
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="flex flex-col gap-3">

@@ -61,6 +61,16 @@ Mientras el dueño no cierra, el periodo queda **Abierto** acumulando pagos — 
 ### Vista de estado por contrato (la pantalla más importante)
 Debe mostrar por contrato: periodo actual abierto/cerrado y cuánto lleva cobrado vs. la meta, mora acumulada si existe, historial de periodos cerrados con su recibo descargable, saldo de capital restante, gastos asociados, préstamos asociados, y documentos/comprobantes adjuntos.
 
+## SOAT y revisión tecnomecánica por moto (implementado)
+
+El dueño necesita hacer seguimiento a la vigencia del SOAT y de la revisión tecnomecánica de cada motocicleta — son documentos legales obligatorios en Colombia, y una moto rentada sin ellos vigentes es un riesgo real para el negocio. Decisiones tomadas:
+
+- **Solo se guarda la fecha de expedición** (`Motocicleta.soatFechaExpedicion` / `tecnomecanicaFechaExpedicion`, ambas opcionales); el **vencimiento siempre se calcula**, nunca se almacena — a petición explícita del usuario, para no depender de que alguien saque la cuenta al registrar el dato. Única fuente de verdad: `src/lib/moto-documentos.ts`.
+- **Asunción a confirmar**: vigencia de 12 meses para ambos documentos desde su expedición (`VIGENCIA_SOAT_MESES` / `VIGENCIA_TECNOMECANICA_MESES`). Si la norma real es distinta, es el único lugar que hay que ajustar.
+- El formulario de la moto muestra el vencimiento calculado en vivo apenas se elige la fecha de expedición.
+- Alerta a 30 días del vencimiento (`UMBRAL_ALERTA_VENCIMIENTO_DIAS`): badge en la ficha de la moto y en el listado, se suma al contador de notificaciones del dashboard, y aparece en una tarjeta de atención dedicada ("SOAT y tecnomecánica") en la página principal.
+- **No incluye** (por decisión explícita, para no ampliar el alcance): adjuntar el escaneo/foto del documento. Se puede agregar después reutilizando `Documento`, que hoy no tiene relación con `Motocicleta`.
+
 ## Decisiones técnicas
 
 - **Next.js 16 (App Router) + TypeScript + React 19**, full-stack en un solo proyecto. **Importante**: Next.js 16 introdujo "Cache Components" (`cacheComponents: true`), un modelo de caché explícito que exige envolver en `<Suspense>` cualquier componente que lea la sesión (cookies) para poder generar un "shell" estático — pensado para sitios con partes públicas cacheables. Esta app es 100% interna, autenticada y con datos financieros que siempre deben ser frescos, así que **no se activa `cacheComponents`** (queda en su valor por defecto, deshabilitado). Con esto, el comportamiento es el "modelo anterior": nada se cachea implícitamente (Prisma no usa `fetch`, así que nunca se cachea salvo que se envuelva explícitamente en `unstable_cache`, cosa que este proyecto no hace). Regla del proyecto: **no envolver en `unstable_cache` ni usar `'use cache'`** en nada que muestre contratos, pagos, saldos o el dashboard.
