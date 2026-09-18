@@ -6,6 +6,7 @@ import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { parseMotocicletaFormData } from "@/lib/validation/motocicleta";
+import { eliminarArchivo, guardarImagen } from "@/lib/upload";
 
 export type MotocicletaFormState = {
   error?: string;
@@ -14,6 +15,12 @@ export type MotocicletaFormState = {
 
 function esViolacionUnica(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+}
+
+/** Extrae el archivo de foto del formulario, si el usuario seleccionó uno. */
+function extraerFoto(formData: FormData): File | null {
+  const foto = formData.get("foto");
+  return foto instanceof File && foto.size > 0 ? foto : null;
 }
 
 export async function createMotocicleta(
@@ -25,8 +32,18 @@ export async function createMotocicleta(
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors as Record<string, string[]> };
   }
 
+  const foto = extraerFoto(formData);
+  let fotoUrl: string | undefined;
+  if (foto) {
+    const resultado = await guardarImagen(foto, "motos");
+    if (!resultado.ok) {
+      return { error: resultado.error };
+    }
+    fotoUrl = resultado.url;
+  }
+
   try {
-    await prisma.motocicleta.create({ data: parsed.data });
+    await prisma.motocicleta.create({ data: { ...parsed.data, fotoUrl } });
   } catch (error) {
     if (esViolacionUnica(error)) {
       return { error: "Ya existe una moto registrada con esa placa." };
@@ -48,13 +65,31 @@ export async function updateMotocicleta(
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors as Record<string, string[]> };
   }
 
+  const foto = extraerFoto(formData);
+  let fotoUrl: string | undefined;
+  let fotoAnterior: string | null = null;
+  if (foto) {
+    const existente = await prisma.motocicleta.findUniqueOrThrow({ where: { id }, select: { fotoUrl: true } });
+    fotoAnterior = existente.fotoUrl;
+
+    const resultado = await guardarImagen(foto, "motos");
+    if (!resultado.ok) {
+      return { error: resultado.error };
+    }
+    fotoUrl = resultado.url;
+  }
+
   try {
-    await prisma.motocicleta.update({ where: { id }, data: parsed.data });
+    await prisma.motocicleta.update({ where: { id }, data: { ...parsed.data, ...(fotoUrl && { fotoUrl }) } });
   } catch (error) {
     if (esViolacionUnica(error)) {
       return { error: "Ya existe una moto registrada con esa placa." };
     }
     throw error;
+  }
+
+  if (fotoUrl && fotoAnterior) {
+    await eliminarArchivo(fotoAnterior);
   }
 
   revalidatePath("/motos");
@@ -81,7 +116,8 @@ export async function deleteMotocicletaSiNoTieneHistorial(
     };
   }
 
-  await prisma.motocicleta.delete({ where: { id } });
+  const moto = await prisma.motocicleta.delete({ where: { id }, select: { fotoUrl: true } });
+  await eliminarArchivo(moto.fotoUrl);
   revalidatePath("/motos");
   return {};
 }

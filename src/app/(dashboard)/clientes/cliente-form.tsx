@@ -48,9 +48,7 @@ export function ClienteForm({
   return (
     <form action={formAction} className="flex max-w-xl flex-col gap-4">
       {state.error && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
-          {state.error}
-        </p>
+        <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{state.error}</p>
       )}
 
       <div className="flex flex-col gap-1">

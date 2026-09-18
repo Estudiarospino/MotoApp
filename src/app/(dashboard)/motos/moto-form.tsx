@@ -1,7 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import Image from "next/image";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { Bike, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +22,44 @@ function BotonGuardar() {
   );
 }
 
+function FotoInput({ fotoActualUrl }: { fotoActualUrl?: string }) {
+  const [preview, setPreview] = useState<string | null>(fotoActualUrl ?? null);
+
+  return (
+    <div className="flex flex-col gap-1">
+      <Label htmlFor="foto">Foto de la moto</Label>
+      <div className="flex items-center gap-4">
+        <div className="relative flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted">
+          {preview ? (
+            <Image src={preview} alt="Vista previa" fill className="object-cover" unoptimized={preview.startsWith("blob:")} />
+          ) : (
+            <Bike className="size-8 text-muted-foreground" />
+          )}
+        </div>
+        <label
+          htmlFor="foto"
+          className="flex cursor-pointer items-center gap-2 rounded-lg border border-input px-3 py-1.5 text-sm font-medium hover:bg-muted"
+        >
+          <Camera className="size-4" />
+          {preview ? "Cambiar foto" : "Subir foto"}
+        </label>
+        <input
+          id="foto"
+          name="foto"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) setPreview(URL.createObjectURL(file));
+          }}
+        />
+      </div>
+      <p className="text-xs text-muted-foreground">JPG, PNG o WEBP. Máximo 5MB.</p>
+    </div>
+  );
+}
+
 export function MotoForm({
   action,
   valoresIniciales,
@@ -33,6 +73,7 @@ export function MotoForm({
     anioModelo?: string;
     precioInicial?: string;
     notas?: string;
+    fotoUrl?: string;
   };
 }) {
   const [state, formAction] = useActionState(action, ESTADO_INICIAL);
@@ -40,10 +81,10 @@ export function MotoForm({
   return (
     <form action={formAction} className="flex max-w-xl flex-col gap-4">
       {state.error && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
-          {state.error}
-        </p>
+        <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{state.error}</p>
       )}
+
+      <FotoInput fotoActualUrl={valoresIniciales?.fotoUrl} />
 
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1">

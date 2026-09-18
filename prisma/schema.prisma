@@ -85,6 +85,7 @@ model Motocicleta {
   anioModelo    Int?
   precioInicial Int
   estado        EstadoMoto @default(DISPONIBLE)
+  fotoUrl       String?
   notas         String?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
@@ -136,10 +137,22 @@ model Contrato {
   gastos         Gasto[]
   prestamos      Prestamo[]
   documentos     Documento[]
+  notas          NotaContrato[]
 
   @@index([estado])
   @@index([clienteId])
   @@index([motocicletaId])
+}
+
+/// Bitácora de seguimiento del contrato (notas internas, orden cronológico, sin edición).
+model NotaContrato {
+  id         String   @id @default(cuid())
+  contratoId String
+  contrato   Contrato @relation(fields: [contratoId], references: [id])
+  contenido  String
+  createdAt  DateTime @default(now())
+
+  @@index([contratoId])
 }
 
 // ==================== PAGO Y PERIODO DE CIERRE (el ledger) ====================

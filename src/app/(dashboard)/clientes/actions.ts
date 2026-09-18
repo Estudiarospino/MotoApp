@@ -58,7 +58,8 @@ export async function updateCliente(
   }
 
   revalidatePath("/clientes");
-  redirect("/clientes");
+  revalidatePath(`/clientes/${id}`);
+  redirect(`/clientes/${id}`);
 }
 
 export async function toggleActivoCliente(id: string): Promise<void> {
@@ -69,4 +70,5 @@ export async function toggleActivoCliente(id: string): Promise<void> {
 
   await prisma.cliente.update({ where: { id }, data: { activo: !cliente.activo } });
   revalidatePath("/clientes");
+  revalidatePath(`/clientes/${id}`);
 }
