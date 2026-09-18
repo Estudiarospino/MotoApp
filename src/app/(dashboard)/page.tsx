@@ -121,7 +121,12 @@ export default async function DashboardHomePage() {
           <PaymentsDonut distribucion={distribucionPagos} />
         </div>
         <div className="lg:col-span-4">
-          <QuickActions />
+          <QuickActions
+            contratosActivos={contratosActivos
+              .slice()
+              .sort((a, b) => b.folio - a.folio)
+              .map((c) => ({ id: c.id, folio: c.folio, clienteNombre: c.cliente.nombreCompleto }))}
+          />
         </div>
       </div>
 

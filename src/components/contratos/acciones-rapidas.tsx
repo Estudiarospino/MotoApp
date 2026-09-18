@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useActionState, useEffect } from "react";
 import { toast } from "sonner";
-import { CircleCheck, ChevronRight, HandCoins, Pencil, Receipt, TriangleAlert, Zap } from "lucide-react";
+import { CircleCheck, ChevronRight, HandCoins, Receipt, TriangleAlert, Zap } from "lucide-react";
 import { cn } from "cn";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DialogTrigger } from "@/components/ui/dialog";
+import { RegistrarPagoDialog } from "@/components/contratos/registrar-pago-dialog";
 import {
   cerrarPeriodoAction,
   compraAnticipadaAction,
@@ -120,7 +122,18 @@ export function AccionesRapidas({
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-0.5">
-        {activo && <FilaLink href="#registrar-pago" icono={Receipt} etiqueta="Registrar pago" destacado />}
+        {activo && (
+          <RegistrarPagoDialog
+            contratoId={contratoId}
+            trigger={
+              <DialogTrigger className="flex items-center gap-2.5 rounded-lg bg-primary/10 px-2.5 py-2 text-left text-sm font-medium text-foreground hover:bg-primary/15">
+                <Receipt className="size-4 shrink-0 text-primary" />
+                <span className="flex-1 truncate">Registrar pago</span>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+              </DialogTrigger>
+            }
+          />
+        )}
 
         {activo && (
           <FilaAccion
@@ -135,8 +148,6 @@ export function AccionesRapidas({
         {ultimoPeriodoId ? (
           <FilaLink href={`/api/recibos/${ultimoPeriodoId}`} icono={Receipt} etiqueta="Generar recibo" />
         ) : null}
-
-        {activo && <FilaLink href="#editar-contrato" icono={Pencil} etiqueta="Editar contrato" />}
 
         {activo && (
           <FilaAccion

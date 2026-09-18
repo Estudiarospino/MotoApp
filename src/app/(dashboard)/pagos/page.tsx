@@ -1,103 +1,282 @@
 import Link from "next/link";
-import { Receipt } from "lucide-react";
+import { ChevronLeft, ChevronRight, CreditCard, Download, Plus, Receipt, Search, Users, Wallet } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { formatCOP } from "@/lib/money";
 import { formatFecha, formatFolioContrato } from "@/lib/format";
+import { construirFiltroPagos, type PagosSearchParams } from "@/lib/pagos-filtro";
 import { buttonVariants } from "@/components/ui/button";
+import { DialogTrigger } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { IconStatCard } from "@/components/icon-stat-card";
+import { PageHeader } from "@/components/page-header";
+import { PorPaginaSelect } from "@/components/por-pagina-select";
+import { PagosFilters } from "@/components/pagos/pagos-filters";
+import { RegistrarPagoPicker } from "@/components/pagos/registrar-pago-picker";
+import { PagosTable, type PagoRow } from "@/components/pagos/pagos-table";
 
-const METODO_LABEL: Record<string, string> = {
-  TRANSFERENCIA: "Transferencia",
-  EFECTIVO: "Efectivo",
-  OTRO: "Otro",
-};
+const POR_PAGINA_DEFECTO = 10;
 
-export default async function PagosPage() {
-  const [pagos, contratosActivos] = await Promise.all([
-    prisma.pago.findMany({
-      orderBy: { fecha: "desc" },
-      take: 50,
-      include: {
-        contrato: {
-          select: { folio: true, cliente: { select: { nombreCompleto: true } } },
-        },
-      },
+function inicioDeMes(fecha: Date): Date {
+  return new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), 1));
+}
+
+function tendenciaPct(actual: number, anterior: number): number | null {
+  if (anterior === 0) return null;
+  return Math.round(((actual - anterior) / anterior) * 100);
+}
+
+export default async function PagosPage({ searchParams }: { searchParams: Promise<PagosSearchParams> }) {
+  const sp = await searchParams;
+  const { where, orderBy, q, metodo, estado, fecha } = construirFiltroPagos(sp);
+  const pagina = Math.max(1, Number(sp.page) || 1);
+  const porPagina = Number(sp.porPagina) || POR_PAGINA_DEFECTO;
+
+  const ahora = new Date();
+  const esteMes = inicioDeMes(ahora);
+  const mesAnterior = new Date(Date.UTC(esteMes.getUTCFullYear(), esteMes.getUTCMonth() - 1, 1));
+
+  const [
+    totalContratos,
+    totalPagos,
+    montoTotalAgg,
+    pagosEsteMes,
+    pagosMesAnterior,
+    contratosConPagos,
+    contratosActivos,
+    totalFiltrado,
+    pagos,
+  ] = await Promise.all([
+    prisma.contrato.count(),
+    prisma.pago.count(),
+    prisma.pago.aggregate({ _sum: { monto: true } }),
+    prisma.pago.aggregate({ _count: true, _sum: { monto: true }, where: { fecha: { gte: esteMes } } }),
+    prisma.pago.aggregate({
+      _count: true,
+      _sum: { monto: true },
+      where: { fecha: { gte: mesAnterior, lt: esteMes } },
     }),
+    prisma.pago.findMany({ distinct: ["contratoId"], select: { contratoId: true } }),
     prisma.contrato.findMany({
       where: { estado: "ACTIVO" },
       orderBy: { folio: "desc" },
       select: { id: true, folio: true, cliente: { select: { nombreCompleto: true } } },
     }),
+    prisma.pago.count({ where }),
+    prisma.pago.findMany({
+      where,
+      orderBy,
+      skip: (pagina - 1) * porPagina,
+      take: porPagina,
+      include: {
+        contrato: { select: { id: true, folio: true, cliente: { select: { id: true, nombreCompleto: true } } } },
+      },
+    }),
   ]);
+
+  const montoTotal = montoTotalAgg._sum.monto ?? 0;
+  const pagoPromedio = totalPagos > 0 ? Math.round(montoTotal / totalPagos) : 0;
+
+  const filas: PagoRow[] = pagos.map((pago) => ({
+    id: pago.id,
+    fechaLabel: formatFecha(pago.fecha),
+    contratoId: pago.contrato.id,
+    folio: pago.contrato.folio,
+    clienteId: pago.contrato.cliente.id,
+    clienteNombre: pago.contrato.cliente.nombreCompleto,
+    metodo: pago.metodo,
+    monto: pago.monto,
+    periodoCierreId: pago.periodoCierreId,
+  }));
+
+  const contratosParaPicker = contratosActivos.map((c) => ({
+    id: c.id,
+    folio: c.folio,
+    clienteNombre: c.cliente.nombreCompleto,
+  }));
+
+  const totalPaginas = Math.max(1, Math.ceil(totalFiltrado / porPagina));
+
+  function queryActual(): Record<string, string> {
+    const params: Record<string, string> = {};
+    if (q) params.q = q;
+    if (metodo !== "todos") params.metodo = metodo;
+    if (estado !== "todos") params.estado = estado;
+    if (fecha !== "todas") params.fecha = fecha;
+    return params;
+  }
+
+  function hrefPagina(p: number): string {
+    const params = new URLSearchParams(queryActual());
+    if (porPagina !== POR_PAGINA_DEFECTO) params.set("porPagina", porPagina.toString());
+    params.set("page", p.toString());
+    return `/pagos?${params.toString()}`;
+  }
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Pagos y recibos</h1>
-        <p className="text-sm text-muted-foreground">
-          Historial de pagos registrados. Cada pago se aplica desde el contrato correspondiente.
-        </p>
+      <PageHeader
+        breadcrumb={[{ label: "Inicio", href: "/" }, { label: "Pagos y recibos" }]}
+        title="Pagos y recibos"
+        subtitle="Historial de pagos registrados. Cada pago se aplica desde el contrato correspondiente."
+        actions={
+          <RegistrarPagoPicker
+            contratos={contratosParaPicker}
+            trigger={
+              <DialogTrigger className={buttonVariants()}>
+                <Plus data-icon="inline-start" className="size-4" />
+                Registrar pago
+              </DialogTrigger>
+            }
+          />
+        }
+      />
+
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <IconStatCard
+          icon={CreditCard}
+          label="Total de pagos"
+          value={totalPagos.toString()}
+          hint="pagos registrados"
+          tendenciaPct={tendenciaPct(pagosEsteMes._count, pagosMesAnterior._count)}
+        />
+        <IconStatCard
+          icon={Wallet}
+          label="Monto total recibido"
+          value={formatCOP(montoTotal)}
+          hint="en todos los periodos"
+          tendenciaPct={tendenciaPct(pagosEsteMes._sum.monto ?? 0, pagosMesAnterior._sum.monto ?? 0)}
+        />
+        <IconStatCard icon={Receipt} label="Pago promedio" value={formatCOP(pagoPromedio)} hint="por transacción" />
+        <IconStatCard
+          icon={Users}
+          label="Contratos con pagos"
+          value={contratosConPagos.length.toString()}
+          hint={`de ${totalContratos} contratos`}
+        />
       </div>
+
+      <PagosFilters basePath="/pagos" valores={{ q, metodo, estado, fecha }} />
 
       <Card>
         <CardContent>
-          <p className="mb-3 text-sm font-medium text-foreground">Registrar un pago</p>
-          {contratosActivos.length === 0 ? (
+          <p className="mb-1 text-sm font-medium text-foreground">Registrar un pago rápido</p>
+          <p className="mb-3 text-xs text-muted-foreground">Selecciona un contrato reciente para registrar un nuevo pago.</p>
+          {contratosParaPicker.length === 0 ? (
             <p className="text-sm text-muted-foreground">No hay contratos activos para registrar pagos.</p>
           ) : (
             <div className="flex flex-wrap gap-2">
-              {contratosActivos.map((c) => (
-                <Link
+              {contratosParaPicker.slice(0, 5).map((c) => (
+                <RegistrarPagoPicker
                   key={c.id}
-                  href={`/contratos/${c.id}`}
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
-                >
-                  {formatFolioContrato(c.folio)} — {c.cliente.nombreCompleto}
-                </Link>
+                  contratos={contratosParaPicker}
+                  contratoIdInicial={c.id}
+                  trigger={
+                    <DialogTrigger
+                      className={buttonVariants({
+                        variant: "outline",
+                        size: "sm",
+                        className: "h-auto flex-col items-start gap-0 px-3 py-1.5",
+                      })}
+                    >
+                      <span className="font-semibold">{formatFolioContrato(c.folio)}</span>
+                      <span className="font-normal text-muted-foreground">{c.clienteNombre}</span>
+                    </DialogTrigger>
+                  }
+                />
               ))}
+              <RegistrarPagoPicker
+                contratos={contratosParaPicker}
+                trigger={
+                  <DialogTrigger
+                    className={buttonVariants({
+                      variant: "outline",
+                      size: "sm",
+                      className:
+                        "h-auto items-center justify-center gap-1.5 self-stretch border-dashed px-3 py-1.5 text-muted-foreground hover:border-foreground/30 hover:text-foreground",
+                    })}
+                  >
+                    <Search className="size-4" />
+                    Buscar otro contrato
+                  </DialogTrigger>
+                }
+              />
             </div>
           )}
         </CardContent>
       </Card>
 
-      {pagos.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
-            <Receipt className="size-8 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Todavía no hay pagos registrados.</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Contrato</TableHead>
-                <TableHead className="hidden sm:table-cell">Cliente</TableHead>
-                <TableHead className="hidden sm:table-cell">Método</TableHead>
-                <TableHead className="text-right">Monto</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pagos.map((pago) => (
-                <TableRow key={pago.id}>
-                  <TableCell>{formatFecha(pago.fecha)}</TableCell>
-                  <TableCell>
-                    <Link href={`/contratos/${pago.contratoId}`} className="font-medium hover:underline">
-                      {formatFolioContrato(pago.contrato.folio)}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">{pago.contrato.cliente.nombreCompleto}</TableCell>
-                  <TableCell className="hidden sm:table-cell">{METODO_LABEL[pago.metodo] ?? pago.metodo}</TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">{formatCOP(pago.monto)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-foreground">Historial de pagos</p>
+            <p className="text-xs text-muted-foreground">Mostrando los pagos registrados en el sistema.</p>
+          </div>
+          {pagos.length > 0 && (
+            <a href={`/api/pagos/export?${new URLSearchParams(queryActual()).toString()}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
+              <Download data-icon="inline-start" className="size-4" />
+              Exportar
+            </a>
+          )}
         </div>
-      )}
+
+        {pagos.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
+              <Receipt className="size-8 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                {totalPagos === 0 ? "Todavía no hay pagos registrados." : "Ningún pago coincide con los filtros."}
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            <PagosTable pagos={filas} offset={(pagina - 1) * porPagina} />
+
+            <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
+              <p className="text-sm text-muted-foreground">
+                Mostrando {(pagina - 1) * porPagina + 1} a {Math.min(pagina * porPagina, totalFiltrado)} de{" "}
+                {totalFiltrado} pago{totalFiltrado === 1 ? "" : "s"}
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <Link
+                    href={hrefPagina(Math.max(1, pagina - 1))}
+                    aria-disabled={pagina === 1}
+                    className={buttonVariants({
+                      variant: "outline",
+                      size: "icon-sm",
+                      className: pagina === 1 ? "pointer-events-none opacity-40" : "",
+                    })}
+                  >
+                    <ChevronLeft className="size-4" />
+                  </Link>
+                  {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((p) => (
+                    <Link
+                      key={p}
+                      href={hrefPagina(p)}
+                      className={buttonVariants({ variant: p === pagina ? "default" : "outline", size: "icon-sm" })}
+                    >
+                      {p}
+                    </Link>
+                  ))}
+                  <Link
+                    href={hrefPagina(Math.min(totalPaginas, pagina + 1))}
+                    aria-disabled={pagina === totalPaginas}
+                    className={buttonVariants({
+                      variant: "outline",
+                      size: "icon-sm",
+                      className: pagina === totalPaginas ? "pointer-events-none opacity-40" : "",
+                    })}
+                  >
+                    <ChevronRight className="size-4" />
+                  </Link>
+                </div>
+                <PorPaginaSelect basePath="/pagos" query={queryActual()} valor={porPagina} />
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

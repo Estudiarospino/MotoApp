@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { useFormStatus } from "react-dom";
-import { Plus } from "lucide-react";
+import { toast } from "sonner";
+import { Paperclip, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,12 +37,22 @@ function BotonRegistrar() {
   );
 }
 
-export function PagoForm({ contratoId }: { contratoId: string }) {
+export function PagoForm({ contratoId, onSuccess }: { contratoId: string; onSuccess?: () => void }) {
   const action = registrarPago.bind(null, contratoId);
   const [state, formAction] = useActionState(action, ESTADO_INICIAL);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (state.ok) {
+      toast.success("Pago registrado correctamente.");
+      formRef.current?.reset();
+      onSuccess?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
 
   return (
-    <form action={formAction} className="flex flex-col gap-3 border-t border-border pt-4">
+    <form ref={formRef} action={formAction} className="flex flex-col gap-3 border-t border-border pt-4">
       {state.error && (
         <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{state.error}</p>
       )}
@@ -49,13 +60,13 @@ export function PagoForm({ contratoId }: { contratoId: string }) {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="flex flex-col gap-1">
           <Label htmlFor="fecha">Fecha</Label>
-          <Input id="fecha" name="fecha" type="date" required />
+          <Input id="fecha" name="fecha" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} />
           <FormFieldError mensajes={state.fieldErrors?.fecha} />
         </div>
 
         <div className="flex flex-col gap-1">
           <Label htmlFor="monto">Monto (COP)</Label>
-          <Input id="monto" name="monto" type="number" required />
+          <Input id="monto" name="monto" type="number" required autoFocus />
           <FormFieldError mensajes={state.fieldErrors?.monto} />
         </div>
 
@@ -84,9 +95,25 @@ export function PagoForm({ contratoId }: { contratoId: string }) {
       </div>
 
       <div className="flex flex-col gap-1">
-        <Label htmlFor="notas">Notas</Label>
-        <Textarea id="notas" name="notas" rows={2} />
+        <Label htmlFor="notas">Nota o descripción</Label>
+        <Textarea id="notas" name="notas" rows={2} placeholder="Opcional" />
         <FormFieldError mensajes={state.fieldErrors?.notas} />
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <Label htmlFor="comprobante" className="flex items-center gap-1.5">
+          <Paperclip className="size-3.5 text-muted-foreground" />
+          Comprobante
+        </Label>
+        <input
+          id="comprobante"
+          name="comprobante"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,application/pdf"
+          className="text-sm file:mr-3 file:rounded-md file:border file:border-input file:bg-background file:px-2.5 file:py-1 file:text-sm"
+        />
+        <p className="text-xs text-muted-foreground">Opcional. JPG, PNG, WEBP o PDF, máx. 5MB.</p>
+        <FormFieldError mensajes={state.fieldErrors?.comprobante} />
       </div>
 
       <div>

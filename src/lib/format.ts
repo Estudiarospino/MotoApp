@@ -8,6 +8,18 @@ export function formatFecha(fecha: Date): string {
   return formatoFecha.format(fecha);
 }
 
+const formatoFechaLarga = new Intl.DateTimeFormat("es-CO", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+/** Formato largo ("1 de julio de 2026"), usado donde la fecha es el dato protagonista. */
+export function formatFechaLarga(fecha: Date): string {
+  return formatoFechaLarga.format(fecha);
+}
+
 /** Formatea un `Date` como valor para <input type="date"> (YYYY-MM-DD, en UTC). */
 export function toFechaInputValue(fecha: Date): string {
   return fecha.toISOString().slice(0, 10);
