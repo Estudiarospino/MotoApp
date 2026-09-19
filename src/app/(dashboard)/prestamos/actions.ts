@@ -1,12 +1,12 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { restarPesos } from "@/lib/money";
 import {
   parseAbonoPrestamoFormData,
+  parseEditarPrestamoFormData,
   parsePrestamoFormData,
   parseTransferenciaCapitalFormData,
 } from "@/lib/validation/prestamo";
@@ -20,6 +20,7 @@ import {
 } from "@/server/engine/transferenciaCapitalService";
 
 export type PrestamoFormState = {
+  ok?: boolean;
   error?: string;
   fieldErrors?: Record<string, string[]>;
 };
@@ -38,10 +39,28 @@ export async function createPrestamo(
   });
 
   revalidatePath("/prestamos");
-  redirect("/prestamos");
+  return { ok: true };
+}
+
+export async function updatePrestamo(
+  id: string,
+  _prevState: PrestamoFormState,
+  formData: FormData,
+): Promise<PrestamoFormState> {
+  const parsed = parseEditarPrestamoFormData(formData);
+  if (!parsed.success) {
+    return { fieldErrors: z.flattenError(parsed.error).fieldErrors as Record<string, string[]> };
+  }
+
+  await prisma.prestamo.update({ where: { id }, data: parsed.data });
+
+  revalidatePath(`/prestamos/${id}`);
+  revalidatePath("/prestamos");
+  return { ok: true };
 }
 
 export type AbonoFormState = {
+  ok?: boolean;
   error?: string;
   fieldErrors?: Record<string, string[]>;
 };
@@ -93,7 +112,7 @@ export async function registrarAbono(
 
   revalidatePath(`/prestamos/${prestamoId}`);
   revalidatePath("/prestamos");
-  return {};
+  return { ok: true };
 }
 
 export type TransferenciaFormState = {

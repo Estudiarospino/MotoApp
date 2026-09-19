@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 import { ArrowRightLeft } from "lucide-react";
 import { formatCOP } from "@/lib/money";
@@ -32,14 +32,23 @@ export function TransferenciaCapitalForm({
   saldoPendiente,
   contratos,
   contratoIdInicial,
+  onSuccess,
 }: {
   prestamoId: string;
   saldoPendiente: number;
   contratos: ContratoOpcion[];
   contratoIdInicial?: string;
+  onSuccess?: () => void;
 }) {
   const action = transferirACapitalAction.bind(null, prestamoId);
   const [state, formAction] = useActionState(action, ESTADO_INICIAL);
+
+  useEffect(() => {
+    if (state.ok) {
+      onSuccess?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
 
   return (
     <form action={formAction} className="flex flex-col gap-3 border-t border-border pt-4">

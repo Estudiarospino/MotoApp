@@ -228,8 +228,9 @@ model MetodoPago {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  pagos  Pago[]
-  gastos Gasto[]
+  pagos          Pago[]
+  gastos         Gasto[]
+  abonosPrestamo AbonoPrestamo[]
 
   @@index([cuentaId])
   @@index([activo])
@@ -371,6 +372,7 @@ model Prestamo {
   abonos               AbonoPrestamo[]
   documentos           Documento[]
   transferenciasCapital TransferenciaPrestamoCapital[]
+  notas                NotaPrestamo[]
 
   @@index([clienteId])
 }
@@ -383,9 +385,25 @@ model AbonoPrestamo {
   fecha DateTime @db.Date
   monto Int
 
+  /// Opcional: con qué método se recibió este abono. Nulo en abonos anteriores a esta función.
+  metodoPagoId String?
+  metodoPago   MetodoPago? @relation(fields: [metodoPagoId], references: [id])
+
   createdAt DateTime @default(now())
 
   documentos Documento[]
+
+  @@index([prestamoId])
+  @@index([metodoPagoId])
+}
+
+/// Nota de seguimiento libre sobre un préstamo (ej. acuerdos verbales, recordatorios).
+model NotaPrestamo {
+  id         String   @id @default(cuid())
+  prestamoId String
+  prestamo   Prestamo @relation(fields: [prestamoId], references: [id])
+  contenido  String
+  createdAt  DateTime @default(now())
 
   @@index([prestamoId])
 }

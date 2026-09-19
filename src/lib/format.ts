@@ -2,6 +2,11 @@ export function formatFolioContrato(folio: number): string {
   return `CT-${folio.toString().padStart(4, "0")}`;
 }
 
+/** Prestamo no tiene folio en la base de datos: se deriva de su posición cronológica de creación. */
+export function formatFolioPrestamo(posicion: number): string {
+  return `PRE-${posicion.toString().padStart(3, "0")}`;
+}
+
 const formatoFecha = new Intl.DateTimeFormat("es-CO", { dateStyle: "medium", timeZone: "UTC" });
 
 export function formatFecha(fecha: Date): string {
