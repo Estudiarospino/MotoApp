@@ -80,23 +80,25 @@ export default async function EditarMotoPage({
 
       <div className="flex flex-col gap-4">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Editar moto</h1>
-        <MotoForm
-          action={actionConId}
-          valoresIniciales={{
-            marca: moto.marca,
-            modelo: moto.modelo,
-            placa: moto.placa,
-            color: moto.color ?? undefined,
-            anioModelo: moto.anioModelo?.toString(),
-            precioInicial: moto.precioInicial.toString(),
-            soatFechaExpedicion: moto.soatFechaExpedicion ? toFechaInputValue(moto.soatFechaExpedicion) : undefined,
-            tecnomecanicaFechaExpedicion: moto.tecnomecanicaFechaExpedicion
-              ? toFechaInputValue(moto.tecnomecanicaFechaExpedicion)
-              : undefined,
-            notas: moto.notas ?? undefined,
-            fotoUrl: moto.fotoUrl ?? undefined,
-          }}
-        />
+        <div className="max-w-xl">
+          <MotoForm
+            action={actionConId}
+            valoresIniciales={{
+              marca: moto.marca,
+              modelo: moto.modelo,
+              placa: moto.placa,
+              color: moto.color ?? undefined,
+              anioModelo: moto.anioModelo?.toString(),
+              precioInicial: moto.precioInicial.toString(),
+              soatFechaExpedicion: moto.soatFechaExpedicion ? toFechaInputValue(moto.soatFechaExpedicion) : undefined,
+              tecnomecanicaFechaExpedicion: moto.tecnomecanicaFechaExpedicion
+                ? toFechaInputValue(moto.tecnomecanicaFechaExpedicion)
+                : undefined,
+              notas: moto.notas ?? undefined,
+              fotoUrl: moto.fotoUrl ?? undefined,
+            }}
+          />
+        </div>
       </div>
 
       <div className="flex flex-col gap-3">
@@ -130,7 +132,7 @@ export default async function EditarMotoPage({
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-medium text-foreground">Rentabilidad</h2>
-          <Link href={`/gastos/nuevo?motoId=${moto.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
+          <Link href={`/gastos?nuevo=1&motocicletaId=${moto.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
             <Plus data-icon="inline-start" className="size-4" />
             Nuevo gasto
           </Link>

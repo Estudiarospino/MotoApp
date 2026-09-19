@@ -1,9 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Bike, Camera } from "lucide-react";
+import { Banknote, Bike, Calendar, Camera, Palette, Save, Tag, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +19,7 @@ function BotonGuardar() {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" disabled={pending}>
+      <Save data-icon="inline-start" className="size-4" />
       {pending ? "Guardando..." : "Guardar"}
     </Button>
   );
@@ -102,6 +103,8 @@ function FechaExpedicionInput({
 export function MotoForm({
   action,
   valoresIniciales,
+  onSuccess,
+  onCancel,
 }: {
   action: (state: MotocicletaFormState, formData: FormData) => Promise<MotocicletaFormState>;
   valoresIniciales?: {
@@ -116,11 +119,20 @@ export function MotoForm({
     notas?: string;
     fotoUrl?: string;
   };
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }) {
   const [state, formAction] = useActionState(action, ESTADO_INICIAL);
 
+  useEffect(() => {
+    if (state.ok) {
+      onSuccess?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
+
   return (
-    <form action={formAction} className="flex max-w-xl flex-col gap-4">
+    <form action={formAction} className="flex flex-col gap-4">
       {state.error && (
         <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{state.error}</p>
       )}
@@ -130,13 +142,19 @@ export function MotoForm({
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1">
           <Label htmlFor="marca">Marca</Label>
-          <Input id="marca" name="marca" defaultValue={valoresIniciales?.marca} required />
+          <div className="relative">
+            <Tag className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input id="marca" name="marca" defaultValue={valoresIniciales?.marca} className="pl-8" required />
+          </div>
           <FormFieldError mensajes={state.fieldErrors?.marca} />
         </div>
 
         <div className="flex flex-col gap-1">
           <Label htmlFor="modelo">Modelo</Label>
-          <Input id="modelo" name="modelo" defaultValue={valoresIniciales?.modelo} required />
+          <div className="relative">
+            <Bike className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input id="modelo" name="modelo" defaultValue={valoresIniciales?.modelo} className="pl-8" required />
+          </div>
           <FormFieldError mensajes={state.fieldErrors?.modelo} />
         </div>
       </div>
@@ -150,12 +168,16 @@ export function MotoForm({
 
         <div className="flex flex-col gap-1">
           <Label htmlFor="anioModelo">Año</Label>
-          <Input
-            id="anioModelo"
-            name="anioModelo"
-            type="number"
-            defaultValue={valoresIniciales?.anioModelo}
-          />
+          <div className="relative">
+            <Calendar className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="anioModelo"
+              name="anioModelo"
+              type="number"
+              defaultValue={valoresIniciales?.anioModelo}
+              className="pl-8"
+            />
+          </div>
           <FormFieldError mensajes={state.fieldErrors?.anioModelo} />
         </div>
       </div>
@@ -163,19 +185,26 @@ export function MotoForm({
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1">
           <Label htmlFor="color">Color</Label>
-          <Input id="color" name="color" defaultValue={valoresIniciales?.color} />
+          <div className="relative">
+            <Palette className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input id="color" name="color" defaultValue={valoresIniciales?.color} className="pl-8" />
+          </div>
           <FormFieldError mensajes={state.fieldErrors?.color} />
         </div>
 
         <div className="flex flex-col gap-1">
           <Label htmlFor="precioInicial">Precio inicial (COP)</Label>
-          <Input
-            id="precioInicial"
-            name="precioInicial"
-            type="number"
-            defaultValue={valoresIniciales?.precioInicial}
-            required
-          />
+          <div className="relative">
+            <Banknote className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="precioInicial"
+              name="precioInicial"
+              type="number"
+              defaultValue={valoresIniciales?.precioInicial}
+              className="pl-8"
+              required
+            />
+          </div>
           <FormFieldError mensajes={state.fieldErrors?.precioInicial} />
         </div>
       </div>
@@ -206,7 +235,13 @@ export function MotoForm({
         <FormFieldError mensajes={state.fieldErrors?.notas} />
       </div>
 
-      <div>
+      <div className="flex justify-end gap-2">
+        {onCancel && (
+          <Button type="button" variant="outline" onClick={onCancel}>
+            <X data-icon="inline-start" className="size-4" />
+            Cancelar
+          </Button>
+        )}
         <BotonGuardar />
       </div>
     </form>

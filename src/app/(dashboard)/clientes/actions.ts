@@ -8,6 +8,7 @@ import { prisma } from "@/lib/db";
 import { parseClienteFormData } from "@/lib/validation/cliente";
 
 export type ClienteFormState = {
+  ok?: boolean;
   error?: string;
   fieldErrors?: Record<string, string[]>;
 };
@@ -35,7 +36,7 @@ export async function createCliente(
   }
 
   revalidatePath("/clientes");
-  redirect("/clientes");
+  return { ok: true };
 }
 
 export async function updateCliente(

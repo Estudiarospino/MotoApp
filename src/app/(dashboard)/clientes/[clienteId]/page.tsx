@@ -140,7 +140,7 @@ export default async function ClienteDetallePage({
             Editar cliente
           </Link>
           <Link
-            href={`/contratos/nuevo?clienteId=${cliente.id}`}
+            href={`/contratos?nuevo=1&clienteId=${cliente.id}`}
             className={cn(buttonVariants(), "hidden sm:inline-flex")}
           >
             <Plus data-icon="inline-start" className="size-4" />
@@ -221,7 +221,7 @@ export default async function ClienteDetallePage({
               <Pencil data-icon="inline-start" className="size-4" />
               Editar cliente
             </Link>
-            <Link href={`/contratos/nuevo?clienteId=${cliente.id}`} className={buttonVariants()}>
+            <Link href={`/contratos?nuevo=1&clienteId=${cliente.id}`} className={buttonVariants()}>
               <Plus data-icon="inline-start" className="size-4" />
               Nuevo contrato
             </Link>

@@ -7,6 +7,7 @@ export type ClientesSearchParams = {
   orden?: string;
   page?: string;
   porPagina?: string;
+  nuevo?: string;
 };
 
 export function construirFiltroClientes(sp: ClientesSearchParams): {

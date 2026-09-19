@@ -10,7 +10,6 @@ import {
   Eye,
   FileText,
   Pencil,
-  Plus,
 } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { formatCOP } from "@/lib/money";
@@ -25,6 +24,7 @@ import { PageHeader } from "@/components/page-header";
 import { MotosFilters } from "@/components/motos/motos-filters";
 import { MotoMoreMenu } from "@/components/motos/moto-more-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { MotoDialog } from "./moto-dialog";
 
 const ESTADO_BADGE = {
   DISPONIBLE: "success",
@@ -97,12 +97,7 @@ export default async function MotosPage({
         subtitle="Inventario de la flota de tu negocio."
         imageSrc="/images/moto-banner.png"
         tagline={{ linea1: "Cada moto", linea2: "es una oportunidad" }}
-        actions={
-          <Link href="/motos/nueva" className={buttonVariants()}>
-            <Plus data-icon="inline-start" className="size-4" />
-            Nueva moto
-          </Link>
-        }
+        actions={<MotoDialog defaultOpen={sp.nuevo === "1"} />}
       />
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">

@@ -7,6 +7,9 @@ export type ContratosSearchParams = {
   fechaCreacion?: string;
   page?: string;
   porPagina?: string;
+  nuevo?: string;
+  clienteId?: string;
+  renegociarDe?: string;
 };
 
 function inicioDeMes(fecha: Date): Date {

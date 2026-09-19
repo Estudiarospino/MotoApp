@@ -430,7 +430,7 @@ export default async function ContratoDetallePage({
                     </Link>
                   ) : (
                     <Link
-                      href={`/contratos/nuevo?renegociarDe=${contrato.id}`}
+                      href={`/contratos?nuevo=1&renegociarDe=${contrato.id}`}
                       className={buttonVariants({ variant: "outline", size: "sm", className: "print:hidden" })}
                     >
                       <ArrowRightLeft data-icon="inline-start" className="size-4" />

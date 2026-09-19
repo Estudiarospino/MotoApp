@@ -9,7 +9,6 @@ import {
   Eye,
   MessageCircle,
   Pencil,
-  Plus,
   Users,
   UserX,
 } from "lucide-react";
@@ -26,6 +25,7 @@ import { PageHeader } from "@/components/page-header";
 import { ClientesFilters } from "@/components/clientes/clientes-filters";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toggleActivoCliente } from "./actions";
+import { ClienteDialog } from "./cliente-dialog";
 
 const POR_PAGINA_DEFECTO = 10;
 
@@ -94,10 +94,7 @@ export default async function ClientesPage({
               <Download data-icon="inline-start" className="size-4" />
               Exportar
             </a>
-            <Link href="/clientes/nuevo" className={buttonVariants()}>
-              <Plus data-icon="inline-start" className="size-4" />
-              Nuevo cliente
-            </Link>
+            <ClienteDialog defaultOpen={sp.nuevo === "1"} />
           </>
         }
       />

@@ -27,7 +27,7 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: Users,
         children: [
           { label: "Ver todos", href: "/clientes" },
-          { label: "Nuevo cliente", href: "/clientes/nuevo" },
+          { label: "Nuevo cliente", href: "/clientes?nuevo=1" },
         ],
       },
       {
@@ -36,7 +36,7 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: Bike,
         children: [
           { label: "Ver todas", href: "/motos" },
-          { label: "Nueva moto", href: "/motos/nueva" },
+          { label: "Nueva moto", href: "/motos?nuevo=1" },
         ],
       },
       {
@@ -45,7 +45,7 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: ClipboardList,
         children: [
           { label: "Ver todos", href: "/contratos" },
-          { label: "Nuevo contrato", href: "/contratos/nuevo" },
+          { label: "Nuevo contrato", href: "/contratos?nuevo=1" },
         ],
       },
     ],
@@ -60,7 +60,7 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: Wrench,
         children: [
           { label: "Ver todos", href: "/gastos" },
-          { label: "Nuevo gasto", href: "/gastos/nuevo" },
+          { label: "Nuevo gasto", href: "/gastos?nuevo=1" },
         ],
       },
       {
@@ -69,7 +69,7 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: HandCoins,
         children: [
           { label: "Ver todos", href: "/prestamos" },
-          { label: "Nuevo préstamo", href: "/prestamos/nuevo" },
+          { label: "Nuevo préstamo", href: "/prestamos?nuevo=1" },
         ],
       },
     ],

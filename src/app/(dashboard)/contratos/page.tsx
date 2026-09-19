@@ -8,7 +8,6 @@ import {
   ChevronRight,
   FileText,
   FileX2,
-  Plus,
   Wallet,
 } from "lucide-react";
 import { prisma } from "@/lib/db";
@@ -25,6 +24,8 @@ import { PageHeader } from "@/components/page-header";
 import { ContratosFilters } from "@/components/contratos/contratos-filters";
 import { PorPaginaSelect } from "@/components/por-pagina-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ContratoDialog } from "./contrato-dialog";
+import type { RenegociacionInfo } from "./contrato-form";
 
 const POR_PAGINA_DEFECTO = 10;
 
@@ -38,26 +39,72 @@ export default async function ContratosPage({
   const pagina = Math.max(1, Number(sp.page) || 1);
   const porPagina = Number(sp.porPagina) || POR_PAGINA_DEFECTO;
 
-  const [totalContratos, activosPortafolio, marcasDistintas, totalFiltrado, contratos] = await Promise.all([
-    prisma.contrato.count(),
-    prisma.contrato.findMany({
-      where: { estado: "ACTIVO" },
-      select: { moraAcumulada: true, fechaAperturaPeriodoActual: true },
-    }),
-    prisma.motocicleta.findMany({ distinct: ["marca"], select: { marca: true }, orderBy: { marca: "asc" } }),
-    prisma.contrato.count({ where }),
-    prisma.contrato.findMany({
-      where,
-      orderBy,
-      skip: (pagina - 1) * porPagina,
-      take: porPagina,
-      include: {
+  const [totalContratos, activosPortafolio, marcasDistintas, totalFiltrado, contratos, clientesActivos, motosDisponibles] =
+    await Promise.all([
+      prisma.contrato.count(),
+      prisma.contrato.findMany({
+        where: { estado: "ACTIVO" },
+        select: { moraAcumulada: true, fechaAperturaPeriodoActual: true },
+      }),
+      prisma.motocicleta.findMany({ distinct: ["marca"], select: { marca: true }, orderBy: { marca: "asc" } }),
+      prisma.contrato.count({ where }),
+      prisma.contrato.findMany({
+        where,
+        orderBy,
+        skip: (pagina - 1) * porPagina,
+        take: porPagina,
+        include: {
+          cliente: { select: { nombreCompleto: true } },
+          motocicleta: { select: { placa: true, marca: true, modelo: true, fotoUrl: true } },
+          pagos: { orderBy: { fecha: "desc" }, take: 1, select: { fecha: true } },
+        },
+      }),
+      prisma.cliente.findMany({
+        where: { activo: true },
+        orderBy: { nombreCompleto: "asc" },
+        select: { id: true, nombreCompleto: true, numeroIdentificacion: true },
+      }),
+      prisma.motocicleta.findMany({
+        where: { estado: "DISPONIBLE" },
+        orderBy: { placa: "asc" },
+        select: { id: true, marca: true, modelo: true, placa: true, precioInicial: true },
+      }),
+    ]);
+
+  let renegociacion: RenegociacionInfo | undefined;
+  let renegociacionError: string | undefined;
+
+  if (sp.renegociarDe) {
+    const contratoAnterior = await prisma.contrato.findUnique({
+      where: { id: sp.renegociarDe },
+      select: {
+        id: true,
+        folio: true,
+        estado: true,
+        clienteId: true,
+        saldoCapitalPendiente: true,
+        moraAcumulada: true,
         cliente: { select: { nombreCompleto: true } },
-        motocicleta: { select: { placa: true, marca: true, modelo: true, fotoUrl: true } },
-        pagos: { orderBy: { fecha: "desc" }, take: 1, select: { fecha: true } },
+        renegociacionComoAnterior: { select: { id: true } },
       },
-    }),
-  ]);
+    });
+
+    if (!contratoAnterior) {
+      renegociacionError = "El contrato que intentas renegociar no existe.";
+    } else if (contratoAnterior.estado !== "INCUMPLIDO_RECUPERADA") {
+      renegociacionError = "Ese contrato no está incumplido; no hay nada que renegociar.";
+    } else if (contratoAnterior.renegociacionComoAnterior) {
+      renegociacionError = "Ese contrato ya fue renegociado antes en otro contrato.";
+    } else {
+      renegociacion = {
+        contratoAnteriorId: contratoAnterior.id,
+        contratoAnteriorFolio: contratoAnterior.folio,
+        clienteId: contratoAnterior.clienteId,
+        clienteNombre: contratoAnterior.cliente.nombreCompleto,
+        deudaPendiente: sumarPesos(contratoAnterior.saldoCapitalPendiente, contratoAnterior.moraAcumulada),
+      };
+    }
+  }
 
   const enMoraPortafolio = activosPortafolio.filter((c) => c.moraAcumulada > 0);
   const moraTotal = sumarPesos(...activosPortafolio.map((c) => c.moraAcumulada));
@@ -92,10 +139,14 @@ export default async function ContratosPage({
         imageSrc="/images/moto-banner.png"
         tagline={{ linea1: "Más contratos,", linea2: "más oportunidades." }}
         actions={
-          <Link href="/contratos/nuevo" className={buttonVariants()}>
-            <Plus data-icon="inline-start" className="size-4" />
-            Nuevo contrato
-          </Link>
+          <ContratoDialog
+            defaultOpen={sp.nuevo === "1"}
+            clientes={clientesActivos}
+            motos={motosDisponibles}
+            clienteIdInicial={sp.clienteId}
+            renegociacion={renegociacion}
+            renegociacionError={renegociacionError}
+          />
         }
       />
 

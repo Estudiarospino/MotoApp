@@ -9,6 +9,7 @@ import { parseMotocicletaFormData } from "@/lib/validation/motocicleta";
 import { eliminarArchivo, guardarImagen } from "@/lib/upload";
 
 export type MotocicletaFormState = {
+  ok?: boolean;
   error?: string;
   fieldErrors?: Record<string, string[]>;
 };
@@ -52,7 +53,7 @@ export async function createMotocicleta(
   }
 
   revalidatePath("/motos");
-  redirect("/motos");
+  return { ok: true };
 }
 
 export async function updateMotocicleta(

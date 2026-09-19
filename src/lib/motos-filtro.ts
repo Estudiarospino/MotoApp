@@ -7,6 +7,7 @@ export type MotosSearchParams = {
   orden?: string;
   page?: string;
   porPagina?: string;
+  nuevo?: string;
 };
 
 export function construirFiltroMotos(sp: MotosSearchParams): {

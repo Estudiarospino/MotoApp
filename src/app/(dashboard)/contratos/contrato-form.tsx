@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { ArrowRightLeft } from "lucide-react";
+import { ArrowRightLeft, Save, X } from "lucide-react";
 import { formatCOP } from "@/lib/money";
 import { formatFolioContrato } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ function BotonGuardar({ renegociacion }: { renegociacion?: boolean }) {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" disabled={pending}>
+      <Save data-icon="inline-start" className="size-4" />
       {pending ? "Guardando..." : renegociacion ? "Crear contrato renegociado" : "Guardar"}
     </Button>
   );
@@ -56,7 +57,7 @@ type TerminosIniciales = {
   fechaFinEstimada?: string;
 };
 
-type RenegociacionInfo = {
+export type RenegociacionInfo = {
   contratoAnteriorId: string;
   contratoAnteriorFolio: number;
   clienteId: string;
@@ -74,6 +75,8 @@ type ContratoFormProps = {
       motos: { id: string; marca: string; modelo: string; placa: string; precioInicial: number }[];
       clienteIdInicial?: string;
       renegociacion?: RenegociacionInfo;
+      onSuccess?: () => void;
+      onCancel?: () => void;
     }
   | { modo: "editar" }
 );
@@ -82,6 +85,13 @@ export function ContratoForm(props: ContratoFormProps) {
   const { action, valoresIniciales } = props;
   const [state, formAction] = useActionState(action, ESTADO_INICIAL);
   const renegociacion = props.modo === "crear" ? props.renegociacion : undefined;
+
+  useEffect(() => {
+    if (state.ok && props.modo === "crear") {
+      props.onSuccess?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
 
   const [fechaInicio, setFechaInicio] = useState("");
   const [plazoMeses, setPlazoMeses] = useState("");
@@ -342,7 +352,13 @@ export function ContratoForm(props: ContratoFormProps) {
         <FormFieldError mensajes={state.fieldErrors?.fechaFinEstimada} />
       </div>
 
-      <div>
+      <div className="flex justify-end gap-2">
+        {props.modo === "crear" && props.onCancel && (
+          <Button type="button" variant="outline" onClick={props.onCancel}>
+            <X data-icon="inline-start" className="size-4" />
+            Cancelar
+          </Button>
+        )}
         <BotonGuardar renegociacion={!!renegociacion} />
       </div>
     </form>

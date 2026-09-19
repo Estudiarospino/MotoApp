@@ -11,6 +11,7 @@ import {
 } from "@/lib/validation/contrato";
 
 export type ContratoFormState = {
+  ok?: boolean;
   error?: string;
   fieldErrors?: Record<string, string[]>;
 };
@@ -77,7 +78,7 @@ export async function createContrato(
 
   revalidatePath("/contratos");
   revalidatePath("/motos");
-  redirect("/contratos");
+  return { ok: true };
 }
 
 export async function updateContrato(
