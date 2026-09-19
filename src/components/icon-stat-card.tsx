@@ -20,6 +20,7 @@ export function IconStatCard({
   hint,
   tono = "neutral",
   tendenciaPct,
+  tendenciaInvertida = false,
   progreso,
   href,
 }: {
@@ -29,6 +30,8 @@ export function IconStatCard({
   hint?: string;
   tono?: Tono;
   tendenciaPct?: number | null;
+  /** Para métricas donde bajar es la buena noticia (p. ej. gasto total): invierte el color de la tendencia. */
+  tendenciaInvertida?: boolean;
   progreso?: number;
   href?: string;
 }) {
@@ -43,7 +46,9 @@ export function IconStatCard({
             <span
               className={cn(
                 "flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-medium",
-                tendenciaPct >= 0 ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive",
+                (tendenciaInvertida ? tendenciaPct <= 0 : tendenciaPct >= 0)
+                  ? "bg-success/10 text-success"
+                  : "bg-destructive/10 text-destructive",
               )}
             >
               {tendenciaPct >= 0 ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}

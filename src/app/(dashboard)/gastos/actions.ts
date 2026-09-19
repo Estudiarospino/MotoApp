@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { parseGastoFormData } from "@/lib/validation/gasto";
 
 export type GastoFormState = {
+  ok?: boolean;
   error?: string;
   fieldErrors?: Record<string, string[]>;
 };
@@ -24,7 +25,7 @@ export async function createGasto(
 
   revalidatePath("/gastos");
   revalidatePath(`/motos/${parsed.data.motocicletaId}`);
-  redirect("/gastos");
+  return { ok: true };
 }
 
 export async function updateGasto(
