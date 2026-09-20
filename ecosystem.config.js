@@ -3,7 +3,7 @@ module.exports = {
     {
       name: 'motoapp',
       script: 'node_modules/.bin/next',
-      args: 'start -p 3001',
+      args: 'start -p 4002',
       cwd: './',
       instances: 1,
       autorestart: true,
