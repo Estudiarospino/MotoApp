@@ -15,10 +15,14 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { formatCOP, sumarPesos } from "@/lib/money";
-import { diasDesde, formatFolioContrato } from "@/lib/format";
-import { estadoContratoInfo, UMBRAL_PERIODO_ABIERTO_DIAS } from "@/lib/contrato-estado";
+import { formatFolioContrato } from "@/lib/format";
+import { contratoEnAtrasoCritico, diasSinPagar, estadoContratoInfo } from "@/lib/contrato-estado";
 import { colorAvatar, iniciales } from "@/lib/avatar";
-import { construirFiltroCartera, type CarteraSearchParams } from "@/lib/cartera-filtro";
+import {
+  construirFiltroCartera,
+  filtrarAtrasoCriticoEnMemoria,
+  type CarteraSearchParams,
+} from "@/lib/cartera-filtro";
 import { buttonVariants } from "@/components/ui/button";
 import { DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -45,40 +49,62 @@ export default async function CarteraPage({ searchParams }: { searchParams: Prom
   const pagina = Math.max(1, Number(sp.page) || 1);
   const porPagina = Number(sp.porPagina) || POR_PAGINA_DEFECTO;
 
-  const [carteraCompleta, totalFiltrado, contratos, metodosPago] = await Promise.all([
-    prisma.contrato.findMany({
-      where: { estado: "ACTIVO" },
-      select: { saldoCapitalPendiente: true, moraAcumulada: true, fechaAperturaPeriodoActual: true },
-    }),
-    prisma.contrato.count({ where }),
-    prisma.contrato.findMany({
-      where,
-      orderBy,
-      skip: (pagina - 1) * porPagina,
-      take: porPagina,
-      include: {
-        cliente: { select: { nombreCompleto: true } },
-        motocicleta: { select: { placa: true, marca: true, modelo: true } },
-      },
-    }),
-    prisma.metodoPago.findMany({
-      where: { activo: true },
-      orderBy: { nombre: "asc" },
-      select: { id: true, nombre: true },
-    }),
-  ]);
+  const carteraCompleta = await prisma.contrato.findMany({
+    where: { estado: "ACTIVO" },
+    include: {
+      cliente: { select: { nombreCompleto: true } },
+      motocicleta: { select: { placa: true, marca: true, modelo: true } },
+      pagos: { orderBy: { fecha: "desc" }, take: 1, select: { fecha: true } },
+    },
+  });
+
+  let totalFiltrado: number;
+  let contratos: typeof carteraCompleta;
+
+  if (estado === "atraso_critico") {
+    const filtrados = filtrarAtrasoCriticoEnMemoria(carteraCompleta, { q, orden });
+    totalFiltrado = filtrados.length;
+    contratos = filtrados.slice((pagina - 1) * porPagina, pagina * porPagina);
+  } else {
+    [totalFiltrado, contratos] = await Promise.all([
+      prisma.contrato.count({ where }),
+      prisma.contrato.findMany({
+        where,
+        orderBy,
+        skip: (pagina - 1) * porPagina,
+        take: porPagina,
+        include: {
+          cliente: { select: { nombreCompleto: true } },
+          motocicleta: { select: { placa: true, marca: true, modelo: true } },
+          pagos: { orderBy: { fecha: "desc" }, take: 1, select: { fecha: true } },
+        },
+      }),
+    ]);
+  }
+
+  const metodosPago = await prisma.metodoPago.findMany({
+    where: { activo: true },
+    orderBy: { nombre: "asc" },
+    select: { id: true, nombre: true },
+  });
 
   const carteraActivaTotal = sumarPesos(...carteraCompleta.map((c) => c.saldoCapitalPendiente));
   const moraTotal = sumarPesos(...carteraCompleta.map((c) => c.moraAcumulada));
   const enMora = carteraCompleta.filter((c) => c.moraAcumulada > 0);
-  const atrasoCritico = enMora.filter((c) => diasDesde(c.fechaAperturaPeriodoActual) > UMBRAL_PERIODO_ABIERTO_DIAS);
+  const atrasoCritico = enMora.filter((c) =>
+    contratoEnAtrasoCritico({
+      frecuenciaPago: c.frecuenciaPago,
+      fechaInicio: c.fechaInicio,
+      ultimoPagoFecha: c.pagos[0]?.fecha ?? null,
+    }),
+  );
   const pctMoraExacto = carteraActivaTotal === 0 ? 0 : (moraTotal / carteraActivaTotal) * 100;
   const pctMoraLabel =
     pctMoraExacto > 0 && pctMoraExacto < 1 ? "<1" : Math.round(pctMoraExacto).toString();
 
   const buckets = BUCKETS.map((b) => {
     const enBucket = enMora.filter((c) => {
-      const dias = diasDesde(c.fechaAperturaPeriodoActual);
+      const dias = diasSinPagar({ fechaInicio: c.fechaInicio, ultimoPagoFecha: c.pagos[0]?.fecha ?? null });
       return dias >= b.min && (b.max === null || dias <= b.max);
     });
     return { ...b, cantidad: enBucket.length, mora: sumarPesos(...enBucket.map((c) => c.moraAcumulada)) };
@@ -165,7 +191,7 @@ export default async function CarteraPage({ searchParams }: { searchParams: Prom
           label="Atraso crítico"
           value={atrasoCritico.length.toString()}
           tono={atrasoCritico.length > 0 ? "destructive" : "success"}
-          hint={`más de ${UMBRAL_PERIODO_ABIERTO_DIAS} días sin cerrar periodo`}
+          hint="sin pagar más de lo que permite su frecuencia"
         />
       </div>
 
@@ -267,7 +293,7 @@ export default async function CarteraPage({ searchParams }: { searchParams: Prom
                       Mora acumulada {iconoOrden("mora")}
                     </Link>
                   </TableHead>
-                  <TableHead className="hidden lg:table-cell">Días del periodo</TableHead>
+                  <TableHead className="hidden lg:table-cell">Días sin pagar</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
@@ -276,7 +302,10 @@ export default async function CarteraPage({ searchParams }: { searchParams: Prom
                 {contratos.map((contrato) => {
                   const color = colorAvatar(contrato.clienteId);
                   const estadoInfo = estadoContratoInfo(contrato);
-                  const diasPeriodo = diasDesde(contrato.fechaAperturaPeriodoActual);
+                  const diasPeriodo = diasSinPagar({
+                    fechaInicio: contrato.fechaInicio,
+                    ultimoPagoFecha: contrato.pagos[0]?.fecha ?? null,
+                  });
                   return (
                     <TableRow key={contrato.id}>
                       <TableCell className="font-medium">{formatFolioContrato(contrato.folio)}</TableCell>

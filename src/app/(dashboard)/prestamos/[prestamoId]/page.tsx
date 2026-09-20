@@ -44,8 +44,15 @@ export default async function PrestamoDetallePage({
     where: { id: prestamoId },
     include: {
       cliente: true,
-      motocicleta: true,
-      contrato: { select: { id: true, folio: true } },
+      contrato: {
+        select: {
+          id: true,
+          folio: true,
+          motocicleta: {
+            select: { id: true, placa: true, marca: true, modelo: true, anioModelo: true, color: true, fotoUrl: true },
+          },
+        },
+      },
       abonos: {
         orderBy: { fecha: "desc" },
         include: { metodoPago: { select: { nombre: true } } },
@@ -64,10 +71,9 @@ export default async function PrestamoDetallePage({
 
   const activo = prestamo.estado === "ACTIVO";
 
-  const [posicion, metodosPago, motos, contratosCliente] = await Promise.all([
+  const [posicion, metodosPago, contratosCliente] = await Promise.all([
     prisma.prestamo.count({ where: { createdAt: { lte: prestamo.createdAt } } }),
     prisma.metodoPago.findMany({ where: { activo: true }, orderBy: { nombre: "asc" }, select: { id: true, nombre: true } }),
-    prisma.motocicleta.findMany({ orderBy: { placa: "asc" }, select: { id: true, placa: true, marca: true, modelo: true } }),
     activo
       ? prisma.contrato.findMany({
           where: { clienteId: prestamo.clienteId, estado: "ACTIVO" },
@@ -144,7 +150,7 @@ export default async function PrestamoDetallePage({
                 ? {
                     saldoPendiente: prestamo.saldoPendiente,
                     contratos: contratosCliente,
-                    contratoIdInicial: prestamo.contratoId ?? undefined,
+                    contratoIdInicial: prestamo.contratoId,
                   }
                 : undefined
             }
@@ -188,9 +194,9 @@ export default async function PrestamoDetallePage({
         <IconStatCard
           icon={FileText}
           label="Contrato asociado"
-          value={prestamo.contrato ? formatFolioContrato(prestamo.contrato.folio) : "—"}
-          hint={prestamo.contrato ? "Ver contrato" : "Sin contrato asociado"}
-          href={prestamo.contrato ? `/contratos/${prestamo.contrato.id}` : undefined}
+          value={formatFolioContrato(prestamo.contrato.folio)}
+          hint="Ver contrato"
+          href={`/contratos/${prestamo.contrato.id}`}
         />
       </div>
 
@@ -253,49 +259,43 @@ export default async function PrestamoDetallePage({
             <CardHeader className="has-data-[slot=card-action]:grid-cols-[1fr_auto]">
               <CardTitle className="flex items-center gap-2">
                 <Bike className="size-4 text-muted-foreground" />
-                Motocicleta asociada
+                Motocicleta del contrato
               </CardTitle>
-              {prestamo.motocicleta && (
-                <CardAction>
-                  <Link
-                    href={`/motos/${prestamo.motocicleta.id}`}
-                    className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-                  >
-                    Ver motocicleta
-                    <ChevronRight className="size-3.5" />
-                  </Link>
-                </CardAction>
-              )}
+              <CardAction>
+                <Link
+                  href={`/motos/${prestamo.contrato.motocicleta.id}`}
+                  className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                >
+                  Ver motocicleta
+                  <ChevronRight className="size-3.5" />
+                </Link>
+              </CardAction>
             </CardHeader>
             <CardContent>
-              {prestamo.motocicleta ? (
-                <div className="flex items-center gap-4">
-                  <div className="relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
-                    {prestamo.motocicleta.fotoUrl ? (
-                      <Image
-                        src={prestamo.motocicleta.fotoUrl}
-                        alt={prestamo.motocicleta.placa}
-                        fill
-                        className="object-cover"
-                      />
-                    ) : (
-                      <Bike className="size-6 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">
-                      {prestamo.motocicleta.marca} {prestamo.motocicleta.modelo}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Placa: {prestamo.motocicleta.placa}
-                      {prestamo.motocicleta.color && ` · Color: ${prestamo.motocicleta.color}`}
-                      {prestamo.motocicleta.anioModelo && ` · Año: ${prestamo.motocicleta.anioModelo}`}
-                    </p>
-                  </div>
+              <div className="flex items-center gap-4">
+                <div className="relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
+                  {prestamo.contrato.motocicleta.fotoUrl ? (
+                    <Image
+                      src={prestamo.contrato.motocicleta.fotoUrl}
+                      alt={prestamo.contrato.motocicleta.placa}
+                      fill
+                      className="object-cover"
+                    />
+                  ) : (
+                    <Bike className="size-6 text-muted-foreground" />
+                  )}
                 </div>
-              ) : (
-                <p className="py-2 text-sm text-muted-foreground">Este préstamo no tiene una motocicleta asociada.</p>
-              )}
+                <div>
+                  <p className="font-medium text-foreground">
+                    {prestamo.contrato.motocicleta.marca} {prestamo.contrato.motocicleta.modelo}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Placa: {prestamo.contrato.motocicleta.placa}
+                    {prestamo.contrato.motocicleta.color && ` · Color: ${prestamo.contrato.motocicleta.color}`}
+                    {prestamo.contrato.motocicleta.anioModelo && ` · Año: ${prestamo.contrato.motocicleta.anioModelo}`}
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -310,10 +310,8 @@ export default async function PrestamoDetallePage({
                   prestamo={{
                     id: prestamo.id,
                     fecha: prestamo.fecha,
-                    motocicletaId: prestamo.motocicletaId,
                     motivo: prestamo.motivo,
                   }}
-                  motos={motos}
                 />
               </CardAction>
             </CardHeader>
@@ -351,16 +349,9 @@ export default async function PrestamoDetallePage({
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Contrato asociado</p>
-                  {prestamo.contrato ? (
-                    <Link
-                      href={`/contratos/${prestamo.contrato.id}`}
-                      className="font-medium text-primary hover:underline"
-                    >
-                      {formatFolioContrato(prestamo.contrato.folio)}
-                    </Link>
-                  ) : (
-                    <p className="font-medium text-foreground">—</p>
-                  )}
+                  <Link href={`/contratos/${prestamo.contrato.id}`} className="font-medium text-primary hover:underline">
+                    {formatFolioContrato(prestamo.contrato.folio)}
+                  </Link>
                 </div>
                 <div className="col-span-2">
                   <p className="text-xs text-muted-foreground">Motivo</p>
@@ -467,22 +458,10 @@ export default async function PrestamoDetallePage({
                 <User data-icon="inline-start" className="size-4" />
                 Ver cliente
               </Link>
-              {prestamo.contrato ? (
-                <Link href={`/contratos/${prestamo.contrato.id}`} className={buttonVariants({ variant: "outline" })}>
-                  <FileText data-icon="inline-start" className="size-4" />
-                  Ver contrato
-                </Link>
-              ) : (
-                <button
-                  type="button"
-                  disabled
-                  title="Este préstamo no tiene contrato asociado."
-                  className={buttonVariants({ variant: "outline", className: "cursor-not-allowed opacity-40" })}
-                >
-                  <FileText data-icon="inline-start" className="size-4" />
-                  Ver contrato
-                </button>
-              )}
+              <Link href={`/contratos/${prestamo.contrato.id}`} className={buttonVariants({ variant: "outline" })}>
+                <FileText data-icon="inline-start" className="size-4" />
+                Ver contrato
+              </Link>
               <NotaDialog
                 prestamoId={prestamo.id}
                 trigger={

@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
-import { Banknote, Bike, Save, User, X } from "lucide-react";
+import { Banknote, ClipboardList, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,10 +15,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FormFieldError } from "@/components/form-field-error";
-import { SIN_SELECCION } from "@/lib/validation/prestamo";
+import { formatFolioContrato } from "@/lib/format";
 import { createPrestamo, type PrestamoFormState } from "./actions";
 
 const ESTADO_INICIAL: PrestamoFormState = {};
+
+export type ContratoParaPrestamo = { id: string; folio: number; clienteNombre: string; motoNombre: string };
 
 function BotonGuardar() {
   const { pending } = useFormStatus();
@@ -31,17 +33,18 @@ function BotonGuardar() {
 }
 
 export function PrestamoForm({
-  clientes,
-  motos,
+  contratos,
+  contratoIdInicial,
   onSuccess,
   onCancel,
 }: {
-  clientes: { id: string; nombreCompleto: string; numeroIdentificacion: string }[];
-  motos: { id: string; placa: string; marca: string; modelo: string }[];
+  contratos: ContratoParaPrestamo[];
+  contratoIdInicial?: string;
   onSuccess?: () => void;
   onCancel?: () => void;
 }) {
   const [state, formAction] = useActionState(createPrestamo, ESTADO_INICIAL);
+  const contratoFijo = contratoIdInicial ? contratos.find((c) => c.id === contratoIdInicial) : undefined;
 
   useEffect(() => {
     if (state.ok) {
@@ -57,26 +60,42 @@ export function PrestamoForm({
       )}
 
       <div className="flex flex-col gap-1">
-        <Label htmlFor="clienteId">Cliente</Label>
-        <Select name="clienteId">
-          <SelectTrigger id="clienteId" className="w-full">
-            <SelectValue placeholder="Selecciona un cliente">
-              {(v: string) => {
-                const cliente = clientes.find((c) => c.id === v);
-                return cliente ? `${cliente.nombreCompleto} — ${cliente.numeroIdentificacion}` : v;
-              }}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {clientes.map((cliente) => (
-              <SelectItem key={cliente.id} value={cliente.id}>
-                <User className="size-3.5 text-muted-foreground" />
-                {cliente.nombreCompleto} — {cliente.numeroIdentificacion}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <FormFieldError mensajes={state.fieldErrors?.clienteId} />
+        <Label htmlFor="contratoId">Contrato</Label>
+        {contratoFijo ? (
+          <>
+            <p className="flex h-8 items-center rounded-lg border border-input bg-muted/50 px-2.5 text-sm text-foreground">
+              {formatFolioContrato(contratoFijo.folio)} — {contratoFijo.clienteNombre} · {contratoFijo.motoNombre}
+            </p>
+            <input type="hidden" name="contratoId" value={contratoFijo.id} />
+          </>
+        ) : (
+          <>
+            <Select name="contratoId">
+              <SelectTrigger id="contratoId" className="w-full">
+                <SelectValue placeholder="Selecciona un contrato activo">
+                  {(v: string) => {
+                    const contrato = contratos.find((c) => c.id === v);
+                    return contrato
+                      ? `${formatFolioContrato(contrato.folio)} — ${contrato.clienteNombre} · ${contrato.motoNombre}`
+                      : v;
+                  }}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {contratos.map((contrato) => (
+                  <SelectItem key={contrato.id} value={contrato.id}>
+                    <ClipboardList className="size-3.5 text-muted-foreground" />
+                    {contrato.clienteNombre} — {contrato.motoNombre} ({formatFolioContrato(contrato.folio)})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Solo se puede prestar a clientes con un contrato activo — la moto se toma de ese contrato.
+            </p>
+          </>
+        )}
+        <FormFieldError mensajes={state.fieldErrors?.contratoId} />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -94,31 +113,6 @@ export function PrestamoForm({
           </div>
           <FormFieldError mensajes={state.fieldErrors?.montoOriginal} />
         </div>
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <Label htmlFor="motocicletaId">Motocicleta relacionada (opcional)</Label>
-        <Select name="motocicletaId" defaultValue={SIN_SELECCION}>
-          <SelectTrigger id="motocicletaId" className="w-full">
-            <SelectValue>
-              {(v: string) => {
-                if (v === SIN_SELECCION) return "Ninguna";
-                const moto = motos.find((m) => m.id === v);
-                return moto ? `${moto.placa} — ${moto.marca} ${moto.modelo}` : v;
-              }}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={SIN_SELECCION}>Ninguna</SelectItem>
-            {motos.map((moto) => (
-              <SelectItem key={moto.id} value={moto.id}>
-                <Bike className="size-3.5 text-muted-foreground" />
-                {moto.placa} — {moto.marca} {moto.modelo}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <FormFieldError mensajes={state.fieldErrors?.motocicletaId} />
       </div>
 
       <div className="flex flex-col gap-1">

@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { AlertTriangle, ChevronRight, FileText } from "lucide-react";
 import { formatCOP } from "@/lib/money";
-import { diasDesde, formatFolioContrato } from "@/lib/format";
-import { estadoContratoInfo } from "@/lib/contrato-estado";
+import { formatFolioContrato } from "@/lib/format";
+import { diasSinPagar, estadoContratoInfo } from "@/lib/contrato-estado";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,10 +12,11 @@ type ContratoAtencion = {
   id: string;
   folio: number;
   moraAcumulada: number;
-  fechaAperturaPeriodoActual: Date;
+  fechaInicio: Date;
   estado: string;
   cliente: { nombreCompleto: string };
   motocicleta: { placa: string };
+  pagos: { fecha: Date }[];
 };
 
 export function AttentionTable({ contratos }: { contratos: ContratoAtencion[] }) {
@@ -37,7 +38,7 @@ export function AttentionTable({ contratos }: { contratos: ContratoAtencion[] })
           <div className="flex flex-col items-center gap-2 py-10 text-center">
             <FileText className="size-7 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
-              Ningún contrato activo tiene mora ni un periodo abierto hace mucho. Todo al día.
+              Ningún contrato activo tiene mora ni lleva sin pagar más de lo esperado. Todo al día.
             </p>
           </div>
         ) : (
@@ -46,7 +47,7 @@ export function AttentionTable({ contratos }: { contratos: ContratoAtencion[] })
             <div className="flex flex-col gap-1 sm:hidden">
               {contratos.map((contrato) => {
                 const estado = estadoContratoInfo(contrato);
-                const dias = diasDesde(contrato.fechaAperturaPeriodoActual);
+                const dias = diasSinPagar({ fechaInicio: contrato.fechaInicio, ultimoPagoFecha: contrato.pagos[0]?.fecha ?? null });
                 return (
                   <Link
                     key={contrato.id}
@@ -90,7 +91,7 @@ export function AttentionTable({ contratos }: { contratos: ContratoAtencion[] })
                 <TableBody>
                   {contratos.map((contrato) => {
                     const estado = estadoContratoInfo(contrato);
-                    const dias = diasDesde(contrato.fechaAperturaPeriodoActual);
+                    const dias = diasSinPagar({ fechaInicio: contrato.fechaInicio, ultimoPagoFecha: contrato.pagos[0]?.fecha ?? null });
                     return (
                       <TableRow key={contrato.id}>
                         <TableCell className="font-medium">{formatFolioContrato(contrato.folio)}</TableCell>

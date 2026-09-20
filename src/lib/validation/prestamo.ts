@@ -11,10 +11,9 @@ const idOpcionalDesdeSelect = z
   .transform((v) => (v === SIN_SELECCION || v.trim() === "" ? undefined : v));
 
 export const prestamoSchema = z.object({
-  clienteId: z.string().min(1, "Selecciona un cliente"),
+  contratoId: z.string().min(1, "Selecciona un contrato activo"),
   fecha: fechaDesdeFormulario,
   montoOriginal: pesosPositivosDesdeFormulario,
-  motocicletaId: idOpcionalDesdeSelect,
   motivo: textoOpcional,
 });
 
@@ -22,17 +21,15 @@ export type PrestamoInput = z.infer<typeof prestamoSchema>;
 
 export function parsePrestamoFormData(formData: FormData) {
   return prestamoSchema.safeParse({
-    clienteId: formData.get("clienteId"),
+    contratoId: formData.get("contratoId"),
     fecha: formData.get("fecha"),
     montoOriginal: formData.get("montoOriginal"),
-    motocicletaId: formData.get("motocicletaId") ?? SIN_SELECCION,
     motivo: formData.get("motivo"),
   });
 }
 
 export const editarPrestamoSchema = z.object({
   fecha: fechaDesdeFormulario,
-  motocicletaId: idOpcionalDesdeSelect,
   motivo: textoOpcional,
 });
 
@@ -41,7 +38,6 @@ export type EditarPrestamoInput = z.infer<typeof editarPrestamoSchema>;
 export function parseEditarPrestamoFormData(formData: FormData) {
   return editarPrestamoSchema.safeParse({
     fecha: formData.get("fecha"),
-    motocicletaId: formData.get("motocicletaId") ?? SIN_SELECCION,
     motivo: formData.get("motivo"),
   });
 }

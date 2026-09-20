@@ -268,17 +268,19 @@ async function main() {
 
   console.log("Creando préstamos...");
   const prestamo1 = await prisma.prestamo.create({
-    data: { clienteId: cliente1.id, motocicletaId: moto1.id, contratoId: contrato1.id, fecha: fechaHace(90), montoOriginal: 500_000, saldoPendiente: 500_000, motivo: "Imprevisto familiar" },
+    data: { clienteId: cliente1.id, contratoId: contrato1.id, fecha: fechaHace(90), montoOriginal: 500_000, saldoPendiente: 500_000, motivo: "Imprevisto familiar" },
   });
   await prisma.abonoPrestamo.create({ data: { prestamoId: prestamo1.id, fecha: fechaHace(30), monto: 200_000 } });
   await prisma.prestamo.update({ where: { id: prestamo1.id }, data: { saldoPendiente: 300_000 } });
 
   await prisma.prestamo.create({
-    data: { clienteId: cliente3.id, motocicletaId: moto3.id, contratoId: contrato3.id, fecha: fechaHace(40), montoOriginal: 300_000, saldoPendiente: 300_000, motivo: "Repuesto urgente" },
+    data: { clienteId: cliente3.id, contratoId: contrato3.id, fecha: fechaHace(40), montoOriginal: 300_000, saldoPendiente: 300_000, motivo: "Repuesto urgente" },
   });
 
+  // cliente5 (contrato5) ya terminó en compra anticipada — este préstamo pagado usa
+  // a cliente2, que sigue con un contrato activo, para respetar la regla de negocio.
   const prestamo3 = await prisma.prestamo.create({
-    data: { clienteId: cliente5.id, fecha: fechaHace(60), montoOriginal: 400_000, saldoPendiente: 400_000, motivo: "Adelanto de nómina" },
+    data: { clienteId: cliente2.id, contratoId: contrato2.id, fecha: fechaHace(60), montoOriginal: 400_000, saldoPendiente: 400_000, motivo: "Adelanto de nómina" },
   });
   await prisma.abonoPrestamo.create({ data: { prestamoId: prestamo3.id, fecha: fechaHace(40), monto: 250_000 } });
   await prisma.abonoPrestamo.create({ data: { prestamoId: prestamo3.id, fecha: fechaHace(15), monto: 150_000 } });

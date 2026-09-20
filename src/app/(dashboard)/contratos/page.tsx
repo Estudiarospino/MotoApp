@@ -12,8 +12,8 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { formatCOP, sumarPesos } from "@/lib/money";
-import { diasDesde, formatFecha, formatFolioContrato } from "@/lib/format";
-import { estadoContratoInfo, UMBRAL_PERIODO_ABIERTO_DIAS } from "@/lib/contrato-estado";
+import { formatFecha, formatFolioContrato } from "@/lib/format";
+import { contratoEnAtrasoCritico, estadoContratoInfo } from "@/lib/contrato-estado";
 import { colorAvatar, iniciales } from "@/lib/avatar";
 import { construirFiltroContratos, type ContratosSearchParams } from "@/lib/contratos-filtro";
 import { buttonVariants } from "@/components/ui/button";
@@ -44,7 +44,12 @@ export default async function ContratosPage({
       prisma.contrato.count(),
       prisma.contrato.findMany({
         where: { estado: "ACTIVO" },
-        select: { moraAcumulada: true, fechaAperturaPeriodoActual: true },
+        select: {
+          moraAcumulada: true,
+          fechaInicio: true,
+          frecuenciaPago: true,
+          pagos: { orderBy: { fecha: "desc" }, take: 1, select: { fecha: true } },
+        },
       }),
       prisma.motocicleta.findMany({ distinct: ["marca"], select: { marca: true }, orderBy: { marca: "asc" } }),
       prisma.contrato.count({ where }),
@@ -108,8 +113,12 @@ export default async function ContratosPage({
 
   const enMoraPortafolio = activosPortafolio.filter((c) => c.moraAcumulada > 0);
   const moraTotal = sumarPesos(...activosPortafolio.map((c) => c.moraAcumulada));
-  const periodosAtrasados = activosPortafolio.filter(
-    (c) => diasDesde(c.fechaAperturaPeriodoActual) > UMBRAL_PERIODO_ABIERTO_DIAS,
+  const atrasoCritico = enMoraPortafolio.filter((c) =>
+    contratoEnAtrasoCritico({
+      frecuenciaPago: c.frecuenciaPago,
+      fechaInicio: c.fechaInicio,
+      ultimoPagoFecha: c.pagos[0]?.fecha ?? null,
+    }),
   );
 
   const totalPaginas = Math.max(1, Math.ceil(totalFiltrado / porPagina));
@@ -174,10 +183,10 @@ export default async function ContratosPage({
         />
         <IconStatCard
           icon={CalendarClock}
-          label="Periodos abiertos"
-          value={periodosAtrasados.length.toString()}
-          tono={periodosAtrasados.length > 0 ? "warning" : "success"}
-          hint={`con más de ${UMBRAL_PERIODO_ABIERTO_DIAS} días`}
+          label="Atraso crítico"
+          value={atrasoCritico.length.toString()}
+          tono={atrasoCritico.length > 0 ? "warning" : "success"}
+          hint="sin pagar más de lo que permite su frecuencia"
         />
       </div>
 

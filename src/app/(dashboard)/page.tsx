@@ -2,8 +2,7 @@ import { AlertTriangle, Bike, ClipboardList, DollarSign } from "lucide-react";
 import { getCurrentUser } from "@/server/auth/session";
 import { prisma } from "@/lib/db";
 import { formatCOP, sumarPesos } from "@/lib/money";
-import { diasDesde } from "@/lib/format";
-import { UMBRAL_PERIODO_ABIERTO_DIAS } from "@/lib/contrato-estado";
+import { contratoEnAtrasoCritico } from "@/lib/contrato-estado";
 import {
   distribucionDesdeMeses,
   getEstadoFlota,
@@ -49,6 +48,7 @@ export default async function DashboardHomePage() {
       include: {
         cliente: { select: { nombreCompleto: true } },
         motocicleta: { select: { placa: true, marca: true, modelo: true } },
+        pagos: { orderBy: { fecha: "desc" }, take: 1, select: { fecha: true } },
       },
     }),
     prisma.contrato.count(),
@@ -72,7 +72,15 @@ export default async function DashboardHomePage() {
   const disponibles = motos.filter((m) => m.estado === "DISPONIBLE").length;
 
   const necesitanAtencion = contratosActivos
-    .filter((c) => c.moraAcumulada > 0 || diasDesde(c.fechaAperturaPeriodoActual) > UMBRAL_PERIODO_ABIERTO_DIAS)
+    .filter(
+      (c) =>
+        c.moraAcumulada > 0 ||
+        contratoEnAtrasoCritico({
+          frecuenciaPago: c.frecuenciaPago,
+          fechaInicio: c.fechaInicio,
+          ultimoPagoFecha: c.pagos[0]?.fecha ?? null,
+        }),
+    )
     .sort((a, b) => b.moraAcumulada - a.moraAcumulada);
 
   const distribucionPagos = distribucionDesdeMeses(resumenFinanciero, 6);

@@ -98,7 +98,6 @@ model Motocicleta {
 
   contratos Contrato[]
   gastos    Gasto[]
-  prestamos Prestamo[]
 }
 
 // ==================== CONTRATO ====================
@@ -352,13 +351,13 @@ enum EstadoPrestamo {
 }
 
 model Prestamo {
-  id            String       @id @default(cuid())
-  clienteId     String
-  cliente       Cliente      @relation(fields: [clienteId], references: [id])
-  motocicletaId String?
-  motocicleta   Motocicleta? @relation(fields: [motocicletaId], references: [id])
-  contratoId    String? // solo referencia informativa, sin ligarse al ledger de arriendo
-  contrato      Contrato?    @relation(fields: [contratoId], references: [id])
+  id        String   @id @default(cuid())
+  clienteId String
+  cliente   Cliente  @relation(fields: [clienteId], references: [id])
+  /// Todo préstamo se otorga contra un contrato activo — la moto siempre se
+  /// resuelve vía `contrato.motocicleta`, nunca queda suelta.
+  contratoId String
+  contrato   Contrato @relation(fields: [contratoId], references: [id])
 
   fecha          DateTime       @db.Date
   montoOriginal  Int
@@ -375,6 +374,7 @@ model Prestamo {
   notas                NotaPrestamo[]
 
   @@index([clienteId])
+  @@index([contratoId])
 }
 
 model AbonoPrestamo {

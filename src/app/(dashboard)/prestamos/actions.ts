@@ -34,11 +34,27 @@ export async function createPrestamo(
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors as Record<string, string[]> };
   }
 
+  const contrato = await prisma.contrato.findUnique({
+    where: { id: parsed.data.contratoId },
+    select: { id: true, clienteId: true, estado: true },
+  });
+  if (!contrato || contrato.estado !== "ACTIVO") {
+    return { fieldErrors: { contratoId: ["Selecciona un contrato activo válido."] } };
+  }
+
   await prisma.prestamo.create({
-    data: { ...parsed.data, saldoPendiente: parsed.data.montoOriginal },
+    data: {
+      contratoId: contrato.id,
+      clienteId: contrato.clienteId,
+      fecha: parsed.data.fecha,
+      montoOriginal: parsed.data.montoOriginal,
+      saldoPendiente: parsed.data.montoOriginal,
+      motivo: parsed.data.motivo,
+    },
   });
 
   revalidatePath("/prestamos");
+  revalidatePath(`/contratos/${contrato.id}`);
   return { ok: true };
 }
 
@@ -52,10 +68,11 @@ export async function updatePrestamo(
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors as Record<string, string[]> };
   }
 
-  await prisma.prestamo.update({ where: { id }, data: parsed.data });
+  const prestamo = await prisma.prestamo.update({ where: { id }, data: parsed.data, select: { contratoId: true } });
 
   revalidatePath(`/prestamos/${id}`);
   revalidatePath("/prestamos");
+  revalidatePath(`/contratos/${prestamo.contratoId}`);
   return { ok: true };
 }
 

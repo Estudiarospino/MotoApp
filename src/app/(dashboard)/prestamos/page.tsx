@@ -48,8 +48,7 @@ export default async function PrestamosPage({
   const [
     totalFiltrado,
     prestamos,
-    clientesActivos,
-    motos,
+    contratosActivos,
     metodosPago,
     totalClientes,
     prestamosActivos,
@@ -68,12 +67,16 @@ export default async function PrestamosPage({
       take: porPagina,
       include: { cliente: { select: { nombreCompleto: true } } },
     }),
-    prisma.cliente.findMany({
-      where: { activo: true },
-      orderBy: { nombreCompleto: "asc" },
-      select: { id: true, nombreCompleto: true, numeroIdentificacion: true },
+    prisma.contrato.findMany({
+      where: { estado: "ACTIVO" },
+      orderBy: { folio: "desc" },
+      select: {
+        id: true,
+        folio: true,
+        cliente: { select: { nombreCompleto: true } },
+        motocicleta: { select: { placa: true, marca: true, modelo: true } },
+      },
     }),
-    prisma.motocicleta.findMany({ orderBy: { placa: "asc" }, select: { id: true, placa: true, marca: true, modelo: true } }),
     prisma.metodoPago.findMany({ where: { activo: true }, orderBy: { nombre: "asc" }, select: { id: true, nombre: true } }),
     prisma.cliente.count(),
     prisma.prestamo.count({ where: { estado: "ACTIVO" } }),
@@ -90,6 +93,13 @@ export default async function PrestamosPage({
       where: { fecha: { gte: inicioMesAnterior, lt: inicioMesActual } },
     }),
   ]);
+
+  const contratosParaPrestamo = contratosActivos.map((c) => ({
+    id: c.id,
+    folio: c.folio,
+    clienteNombre: c.cliente.nombreCompleto,
+    motoNombre: `${c.motocicleta.placa} — ${c.motocicleta.marca} ${c.motocicleta.modelo}`,
+  }));
 
   const saldoPendienteTotal = agregadoGeneral._sum.saldoPendiente ?? 0;
   const totalPrestado = agregadoGeneral._sum.montoOriginal ?? 0;
@@ -154,7 +164,7 @@ export default async function PrestamosPage({
               <Download data-icon="inline-start" className="size-4" />
               Exportar
             </a>
-            <PrestamoDialog defaultOpen={sp.nuevo === "1"} clientes={clientesActivos} motos={motos} />
+            <PrestamoDialog defaultOpen={sp.nuevo === "1"} contratos={contratosParaPrestamo} />
           </>
         }
       />

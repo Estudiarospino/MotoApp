@@ -108,7 +108,7 @@ export async function deleteMotocicletaSiNoTieneHistorial(
   const [contratos, gastos, prestamos] = await Promise.all([
     prisma.contrato.count({ where: { motocicletaId: id } }),
     prisma.gasto.count({ where: { motocicletaId: id } }),
-    prisma.prestamo.count({ where: { motocicletaId: id } }),
+    prisma.prestamo.count({ where: { contrato: { motocicletaId: id } } }),
   ]);
 
   if (contratos > 0 || gastos > 0 || prestamos > 0) {

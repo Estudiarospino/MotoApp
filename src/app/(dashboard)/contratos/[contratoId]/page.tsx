@@ -24,11 +24,11 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { formatCOP, sumarPesos } from "@/lib/money";
-import { diasDesde, formatFecha, formatFechaLarga, formatFolioContrato, toFechaInputValue } from "@/lib/format";
-import { estadoContratoInfo } from "@/lib/contrato-estado";
+import { formatFecha, formatFechaLarga, formatFolioContrato, toFechaInputValue } from "@/lib/format";
+import { contratoEnAtrasoCritico, diasSinPagar, estadoContratoInfo } from "@/lib/contrato-estado";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress, ProgressTrack, ProgressIndicator } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DialogTrigger } from "@/components/ui/dialog";
@@ -43,6 +43,8 @@ import { TabPeriodos } from "@/components/contratos/tab-periodos";
 import { TabResumenFinanciero } from "@/components/contratos/tab-resumen-financiero";
 import { TabDocumentos } from "@/components/contratos/tab-documentos";
 import { TabNotas } from "@/components/contratos/tab-notas";
+import { PrestamoDialog } from "@/app/(dashboard)/prestamos/prestamo-dialog";
+import type { ContratoParaPrestamo } from "@/app/(dashboard)/prestamos/prestamo-form";
 
 const CATEGORIA_GASTO_LABEL = {
   MANTENIMIENTO: "Mantenimiento",
@@ -111,11 +113,18 @@ export default async function ContratoDetallePage({
     notFound();
   }
 
-  const [gastosMoto, prestamosCliente, metodosPago] = await Promise.all([
+  const [gastosMoto, prestamosContrato, metodosPago] = await Promise.all([
     prisma.gasto.findMany({ where: { motocicletaId: contrato.motocicletaId }, orderBy: { fecha: "desc" } }),
-    prisma.prestamo.findMany({ where: { clienteId: contrato.clienteId }, orderBy: { fecha: "desc" } }),
+    prisma.prestamo.findMany({ where: { contratoId: contrato.id }, orderBy: { fecha: "desc" } }),
     prisma.metodoPago.findMany({ where: { activo: true }, orderBy: { nombre: "asc" }, select: { id: true, nombre: true } }),
   ]);
+
+  const contratoParaPrestamo: ContratoParaPrestamo = {
+    id: contrato.id,
+    folio: contrato.folio,
+    clienteNombre: contrato.cliente.nombreCompleto,
+    motoNombre: `${contrato.motocicleta.placa} — ${contrato.motocicleta.marca} ${contrato.motocicleta.modelo}`,
+  };
 
   const valoresInicialesTerminos = {
     fechaInicio: toFechaInputValue(contrato.fechaInicio),
@@ -141,8 +150,12 @@ export default async function ContratoDetallePage({
   const metaArriendo = sumarPesos(contrato.arriendoFijoMensual, contrato.moraAcumulada);
   const pctCobrado = metaArriendo > 0 ? Math.min(100, Math.round((cobradoPeriodo / metaArriendo) * 100)) : 0;
   const faltaPorPagar = Math.max(metaArriendo - cobradoPeriodo, 0);
-  const diasPeriodoAbierto = diasDesde(contrato.fechaAperturaPeriodoActual);
+  const ultimoPagoFecha = contrato.pagos[0]?.fecha ?? null;
+  const diasSinPagarValor = diasSinPagar({ fechaInicio: contrato.fechaInicio, ultimoPagoFecha });
   const activo = contrato.estado === "ACTIVO";
+  const enAtrasoCritico =
+    activo &&
+    contratoEnAtrasoCritico({ frecuenciaPago: contrato.frecuenciaPago, fechaInicio: contrato.fechaInicio, ultimoPagoFecha });
   const estado = estadoContratoInfo(contrato);
 
   const abonadoCapital = sumarPesos(contrato.valorTotalContrato, -contrato.saldoCapitalPendiente);
@@ -326,8 +339,9 @@ export default async function ContratoDetallePage({
               </div>
               <CampoIcono
                 icono={CalendarCheck}
-                etiqueta="Periodos abiertos"
-                valor={activo ? `1 (${diasPeriodoAbierto} día${diasPeriodoAbierto === 1 ? "" : "s"})` : "0"}
+                etiqueta="Días sin pagar"
+                valor={activo ? `${diasSinPagarValor} día${diasSinPagarValor === 1 ? "" : "s"}` : "—"}
+                critico={enAtrasoCritico}
               />
             </div>
           </CardContent>
@@ -604,33 +618,51 @@ export default async function ContratoDetallePage({
             </Card>
           )}
 
-          {prestamosCliente.length > 0 && (
+          {(activo || prestamosContrato.length > 0) && (
             <Card>
-              <CardHeader>
+              <CardHeader className="has-data-[slot=card-action]:grid-cols-[1fr_auto]">
                 <CardTitle className="flex items-center gap-2">
                   <HandCoins className="size-4 text-muted-foreground" />
-                  Préstamos del cliente
+                  Préstamos del contrato
                 </CardTitle>
+                {activo && (
+                  <CardAction>
+                    <PrestamoDialog
+                      contratos={[contratoParaPrestamo]}
+                      contratoIdInicial={contrato.id}
+                      trigger={
+                        <DialogTrigger className="flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+                          <Plus className="size-3.5" />
+                          Nuevo
+                        </DialogTrigger>
+                      }
+                    />
+                  </CardAction>
+                )}
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
-                {prestamosCliente.map((prestamo) => (
-                  <Link
-                    key={prestamo.id}
-                    href={`/prestamos/${prestamo.id}`}
-                    className="-m-2 flex items-center justify-between gap-3 rounded-lg p-2 text-sm hover:bg-muted"
-                  >
-                    <div className="flex flex-col">
-                      <span className="text-foreground">{formatCOP(prestamo.saldoPendiente)} pendiente</span>
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Calendar className="size-3" />
-                        {formatFecha(prestamo.fecha)}
-                      </span>
-                    </div>
-                    <Badge variant={prestamo.estado === "ACTIVO" ? "default" : "secondary"}>
-                      {prestamo.estado === "ACTIVO" ? "Activo" : "Pagado"}
-                    </Badge>
-                  </Link>
-                ))}
+                {prestamosContrato.length === 0 ? (
+                  <p className="py-2 text-sm text-muted-foreground">Este contrato todavía no tiene préstamos.</p>
+                ) : (
+                  prestamosContrato.map((prestamo) => (
+                    <Link
+                      key={prestamo.id}
+                      href={`/prestamos/${prestamo.id}`}
+                      className="-m-2 flex items-center justify-between gap-3 rounded-lg p-2 text-sm hover:bg-muted"
+                    >
+                      <div className="flex flex-col">
+                        <span className="text-foreground">{formatCOP(prestamo.saldoPendiente)} pendiente</span>
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Calendar className="size-3" />
+                          {formatFecha(prestamo.fecha)}
+                        </span>
+                      </div>
+                      <Badge variant={prestamo.estado === "ACTIVO" ? "default" : "secondary"}>
+                        {prestamo.estado === "ACTIVO" ? "Activo" : "Pagado"}
+                      </Badge>
+                    </Link>
+                  ))
+                )}
               </CardContent>
             </Card>
           )}
@@ -653,18 +685,24 @@ function CampoIcono({
   icono: Icono,
   etiqueta,
   valor,
+  critico = false,
 }: {
   icono: typeof Calendar;
   etiqueta: string;
   valor: string;
+  critico?: boolean;
 }) {
   return (
     <div className="flex min-w-0 items-center justify-between gap-3">
       <span className="flex min-w-0 items-center gap-2.5 text-muted-foreground">
-        <Icono className="size-4 shrink-0 text-primary" />
+        <Icono className={`size-4 shrink-0 ${critico ? "text-destructive" : "text-primary"}`} />
         <span className="truncate">{etiqueta}</span>
       </span>
-      <span className="shrink-0 text-right font-semibold tabular-nums text-foreground">{valor}</span>
+      <span
+        className={`shrink-0 text-right font-semibold tabular-nums ${critico ? "text-destructive" : "text-foreground"}`}
+      >
+        {valor}
+      </span>
     </div>
   );
 }
