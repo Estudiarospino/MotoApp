@@ -9,6 +9,9 @@ export function EditarContratoDialog({
 }: {
   contratoId: string;
   valoresIniciales: {
+    fechaInicio: string;
+    valorTotalContrato: string;
+    saldoCapitalPendiente: string;
     arriendoFijoMensual: string;
     metaMensualReferencia?: string;
     cuotaDiariaReferencia?: string;

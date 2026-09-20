@@ -90,25 +90,25 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
+  --background: oklch(0.16 0.02 265);
+  --foreground: oklch(0.95 0.008 260);
+  --card: oklch(0.21 0.022 264);
+  --card-foreground: oklch(0.95 0.008 260);
+  --popover: oklch(0.225 0.024 264);
+  --popover-foreground: oklch(0.95 0.008 260);
   --primary: oklch(0.585 0.233 277.117);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.255 0.02 264);
+  --secondary-foreground: oklch(0.93 0.008 260);
+  --muted: oklch(0.23 0.018 264);
+  --muted-foreground: oklch(0.64 0.025 260);
+  --accent: oklch(0.27 0.035 272);
+  --accent-foreground: oklch(0.95 0.008 260);
   --destructive: oklch(0.704 0.191 22.216);
   --success: oklch(0.696 0.17 162.48);
   --warning: oklch(0.769 0.188 70.08);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 14%);
   --ring: oklch(0.585 0.233 277.117);
   /* Variantes más claras de la misma paleta, para el modo oscuro (no expuesto en la UI todavía). */
   --chart-1: #3457f5;
@@ -137,5 +137,20 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* Niebla decorativa del modo oscuro: solo en el shell autenticado, no en /login. */
+.dark .app-shell {
+  background-image:
+    radial-gradient(60% 50% at 15% -10%, oklch(0.55 0.16 277 / 16%), transparent 70%),
+    radial-gradient(50% 45% at 100% 0%, oklch(0.6 0.14 230 / 10%), transparent 70%),
+    radial-gradient(55% 50% at 40% 115%, oklch(0.5 0.13 300 / 9%), transparent 70%);
+  background-attachment: fixed;
+}
+
+@media print {
+  .app-shell {
+    background-image: none;
   }
 }

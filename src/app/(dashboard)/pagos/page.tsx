@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, CreditCard, Download, Plus, Receipt, Search, Users, Wallet } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, CreditCard, Download, Plus, Receipt, Search, Users, Wallet } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { formatCOP } from "@/lib/money";
 import { formatFecha, formatFolioContrato } from "@/lib/format";
@@ -60,7 +60,13 @@ export default async function PagosPage({ searchParams }: { searchParams: Promis
     prisma.contrato.findMany({
       where: { estado: "ACTIVO" },
       orderBy: { folio: "desc" },
-      select: { id: true, folio: true, saldoCapitalPendiente: true, cliente: { select: { nombreCompleto: true } } },
+      select: {
+        id: true,
+        folio: true,
+        saldoCapitalPendiente: true,
+        cliente: { select: { nombreCompleto: true } },
+        motocicleta: { select: { placa: true, marca: true, modelo: true } },
+      },
     }),
     prisma.metodoPago.findMany({
       where: { activo: true },
@@ -100,6 +106,7 @@ export default async function PagosPage({ searchParams }: { searchParams: Promis
     id: c.id,
     folio: c.folio,
     clienteNombre: c.cliente.nombreCompleto,
+    motoNombre: `${c.motocicleta.placa} — ${c.motocicleta.marca} ${c.motocicleta.modelo}`,
     saldoCapitalPendiente: c.saldoCapitalPendiente,
   }));
 
@@ -129,16 +136,22 @@ export default async function PagosPage({ searchParams }: { searchParams: Promis
         title="Pagos y recibos"
         subtitle="Historial de pagos registrados. Cada pago se aplica desde el contrato correspondiente."
         actions={
-          <RegistrarPagoPicker
-            contratos={contratosParaPicker}
-            metodosPago={metodosPago}
-            trigger={
-              <DialogTrigger className={buttonVariants()}>
-                <Plus data-icon="inline-start" className="size-4" />
-                Registrar pago
-              </DialogTrigger>
-            }
-          />
+          <>
+            <Link href="/pagos/calendario" className={buttonVariants({ variant: "outline" })}>
+              <CalendarDays data-icon="inline-start" className="size-4" />
+              Calendario
+            </Link>
+            <RegistrarPagoPicker
+              contratos={contratosParaPicker}
+              metodosPago={metodosPago}
+              trigger={
+                <DialogTrigger className={buttonVariants()}>
+                  <Plus data-icon="inline-start" className="size-4" />
+                  Registrar pago
+                </DialogTrigger>
+              }
+            />
+          </>
         }
       />
 
@@ -175,7 +188,7 @@ export default async function PagosPage({ searchParams }: { searchParams: Promis
           {contratosParaPicker.length === 0 ? (
             <p className="text-sm text-muted-foreground">No hay contratos activos para registrar pagos.</p>
           ) : (
-            <div className="flex flex-wrap gap-2">
+            <div className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
               {contratosParaPicker.slice(0, 5).map((c) => (
                 <RegistrarPagoPicker
                   key={c.id}
@@ -187,7 +200,7 @@ export default async function PagosPage({ searchParams }: { searchParams: Promis
                       className={buttonVariants({
                         variant: "outline",
                         size: "sm",
-                        className: "h-auto flex-col items-start gap-0 px-3 py-1.5",
+                        className: "h-auto shrink-0 snap-start flex-col items-start gap-0 px-3 py-1.5 sm:shrink",
                       })}
                     >
                       <span className="font-semibold">{formatFolioContrato(c.folio)}</span>
@@ -205,7 +218,7 @@ export default async function PagosPage({ searchParams }: { searchParams: Promis
                       variant: "outline",
                       size: "sm",
                       className:
-                        "h-auto items-center justify-center gap-1.5 self-stretch border-dashed px-3 py-1.5 text-muted-foreground hover:border-foreground/30 hover:text-foreground",
+                        "h-auto shrink-0 snap-start items-center justify-center gap-1.5 self-stretch border-dashed px-3 py-1.5 text-muted-foreground hover:border-foreground/30 hover:text-foreground sm:shrink",
                     })}
                   >
                     <Search className="size-4" />

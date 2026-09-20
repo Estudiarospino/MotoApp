@@ -33,7 +33,7 @@ export function DashboardShell({
 
   return (
     <HeaderOverrideProvider>
-      <div className="flex min-h-dvh w-full bg-background">
+      <div className="app-shell flex min-h-dvh w-full bg-background">
         <Sidebar
           collapsed={collapsed}
           mobileOpen={mobileOpen}

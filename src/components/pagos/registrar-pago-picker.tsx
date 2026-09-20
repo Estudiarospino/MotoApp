@@ -7,7 +7,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { PagoForm, type MetodoPagoOpcion } from "@/app/(dashboard)/contratos/pago-form";
 
-export type ContratoParaPago = { id: string; folio: number; clienteNombre: string; saldoCapitalPendiente: number };
+export type ContratoParaPago = {
+  id: string;
+  folio: number;
+  clienteNombre: string;
+  motoNombre: string;
+  saldoCapitalPendiente: number;
+};
 
 export function RegistrarPagoPicker({
   contratos,
@@ -30,7 +36,10 @@ export function RegistrarPagoPicker({
     const q = busqueda.trim().toLowerCase();
     if (!q) return contratos;
     return contratos.filter(
-      (c) => c.clienteNombre.toLowerCase().includes(q) || formatFolioContrato(c.folio).toLowerCase().includes(q),
+      (c) =>
+        c.clienteNombre.toLowerCase().includes(q) ||
+        c.motoNombre.toLowerCase().includes(q) ||
+        formatFolioContrato(c.folio).toLowerCase().includes(q),
     );
   }, [contratos, busqueda]);
 
@@ -63,7 +72,8 @@ export function RegistrarPagoPicker({
               </button>
             )}
             <p className="-mt-2 text-sm text-muted-foreground">
-              {formatFolioContrato(contratoSeleccionado.folio)} — {contratoSeleccionado.clienteNombre}
+              {formatFolioContrato(contratoSeleccionado.folio)} — {contratoSeleccionado.clienteNombre} ·{" "}
+              {contratoSeleccionado.motoNombre}
             </p>
             <PagoForm
               contratoId={contratoSeleccionado.id}
@@ -95,8 +105,11 @@ export function RegistrarPagoPicker({
                     onClick={() => setContratoId(c.id)}
                     className="flex items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-muted"
                   >
-                    <span className="font-medium text-foreground">{c.clienteNombre}</span>
-                    <span className="text-muted-foreground">{formatFolioContrato(c.folio)}</span>
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate font-medium text-foreground">{c.clienteNombre}</span>
+                      <span className="truncate text-xs text-muted-foreground">{c.motoNombre}</span>
+                    </span>
+                    <span className="shrink-0 text-muted-foreground">{formatFolioContrato(c.folio)}</span>
                   </button>
                 ))
               )}

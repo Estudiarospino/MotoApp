@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FilterX, Search } from "lucide-react";
+import { Filter, FilterX, Search } from "lucide-react";
+import { cn } from "cn";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -51,6 +52,7 @@ export function GastosFilters({
 }) {
   const router = useRouter();
   const [q, setQ] = useState(valores.q);
+  const [masFiltrosMovil, setMasFiltrosMovil] = useState(false);
   const primerRender = useRef(true);
 
   const categoriaOpciones = [
@@ -93,102 +95,213 @@ export function GastosFilters({
     valores.motocicletaId !== "todas" ||
     valores.estado !== "todos";
 
+  function limpiar() {
+    setQ(VALORES_DEFECTO.q);
+    router.push(basePath);
+  }
+
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <div className="flex flex-col gap-1 xl:col-span-1">
-          <span className="text-xs text-muted-foreground">Buscar</span>
-          <div className="relative">
-            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+    <>
+      {/* Móvil: búsqueda + chips de categoría + panel colapsable con el resto */}
+      <div className="flex flex-col gap-3 sm:hidden">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Descripción, placa, categoría..."
-              className="pl-8"
+              className="pl-9"
             />
+          </div>
+          <button
+            type="button"
+            onClick={() => setMasFiltrosMovil((v) => !v)}
+            aria-label="Más filtros"
+            className={cn(
+              "flex size-8 shrink-0 items-center justify-center rounded-lg border border-input",
+              masFiltrosMovil && "border-ring bg-muted",
+            )}
+          >
+            <Filter className="size-4 text-muted-foreground" />
+          </button>
+        </div>
+
+        <div className="flex gap-2 overflow-x-auto pb-0.5">
+          {categoriaOpciones.map((opcion) => {
+            const activo = valores.categoria === opcion.value;
+            return (
+              <button
+                key={opcion.value}
+                type="button"
+                onClick={() => navegar({ categoria: opcion.value })}
+                className={cn(
+                  "shrink-0 rounded-full border px-3 py-1 text-sm font-medium whitespace-nowrap",
+                  activo ? "border-primary bg-primary text-primary-foreground" : "border-input text-muted-foreground",
+                )}
+              >
+                {opcion.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {masFiltrosMovil && (
+          <div className="flex flex-col gap-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">Fecha desde</span>
+                <Input
+                  type="date"
+                  value={valores.fechaDesde}
+                  onChange={(e) => navegar({ fechaDesde: e.target.value })}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">Fecha hasta</span>
+                <Input
+                  type="date"
+                  value={valores.fechaHasta}
+                  onChange={(e) => navegar({ fechaHasta: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">Motocicleta</span>
+              <Select value={valores.motocicletaId} onValueChange={(v) => navegar({ motocicletaId: v as string })}>
+                <SelectTrigger className="w-full">
+                  <SelectValue>{(v: string) => motoOpciones.find((o) => o.value === v)?.label ?? v}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {motoOpciones.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-end gap-2">
+              <div className="flex flex-1 flex-col gap-1">
+                <span className="text-xs text-muted-foreground">Estado</span>
+                <Select value={valores.estado} onValueChange={(v) => navegar({ estado: v as string })}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue>{(v: string) => ESTADO_OPCIONES.find((o) => o.value === v)?.label ?? v}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ESTADO_OPCIONES.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                disabled={!hayFiltrosActivos}
+                onClick={limpiar}
+                aria-label="Limpiar filtros"
+              >
+                <FilterX className="size-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Escritorio: barra de filtros completa */}
+      <div className="hidden flex-col gap-3 rounded-xl border border-border bg-card p-3 sm:flex">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+          <div className="flex flex-col gap-1 xl:col-span-1">
+            <span className="text-xs text-muted-foreground">Buscar</span>
+            <div className="relative">
+              <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Descripción, placa, categoría..."
+                className="pl-8"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">Fecha desde</span>
+            <Input
+              type="date"
+              value={valores.fechaDesde}
+              onChange={(e) => navegar({ fechaDesde: e.target.value })}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">Fecha hasta</span>
+            <Input
+              type="date"
+              value={valores.fechaHasta}
+              onChange={(e) => navegar({ fechaHasta: e.target.value })}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">Categoría</span>
+            <Select value={valores.categoria} onValueChange={(v) => navegar({ categoria: v as string })}>
+              <SelectTrigger className="w-full">
+                <SelectValue>{(v: string) => categoriaOpciones.find((o) => o.value === v)?.label ?? v}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {categoriaOpciones.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">Motocicleta</span>
+            <Select value={valores.motocicletaId} onValueChange={(v) => navegar({ motocicletaId: v as string })}>
+              <SelectTrigger className="w-full">
+                <SelectValue>{(v: string) => motoOpciones.find((o) => o.value === v)?.label ?? v}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {motoOpciones.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">Estado</span>
+            <Select value={valores.estado} onValueChange={(v) => navegar({ estado: v as string })}>
+              <SelectTrigger className="w-full">
+                <SelectValue>{(v: string) => ESTADO_OPCIONES.find((o) => o.value === v)?.label ?? v}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {ESTADO_OPCIONES.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">Fecha desde</span>
-          <Input
-            type="date"
-            value={valores.fechaDesde}
-            onChange={(e) => navegar({ fechaDesde: e.target.value })}
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">Fecha hasta</span>
-          <Input
-            type="date"
-            value={valores.fechaHasta}
-            onChange={(e) => navegar({ fechaHasta: e.target.value })}
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">Categoría</span>
-          <Select value={valores.categoria} onValueChange={(v) => navegar({ categoria: v as string })}>
-            <SelectTrigger className="w-full">
-              <SelectValue>{(v: string) => categoriaOpciones.find((o) => o.value === v)?.label ?? v}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {categoriaOpciones.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">Motocicleta</span>
-          <Select value={valores.motocicletaId} onValueChange={(v) => navegar({ motocicletaId: v as string })}>
-            <SelectTrigger className="w-full">
-              <SelectValue>{(v: string) => motoOpciones.find((o) => o.value === v)?.label ?? v}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {motoOpciones.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground">Estado</span>
-          <Select value={valores.estado} onValueChange={(v) => navegar({ estado: v as string })}>
-            <SelectTrigger className="w-full">
-              <SelectValue>{(v: string) => ESTADO_OPCIONES.find((o) => o.value === v)?.label ?? v}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {ESTADO_OPCIONES.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Button type="button" variant="outline" disabled={!hayFiltrosActivos} onClick={limpiar} className="self-end">
+          <FilterX data-icon="inline-start" className="size-4" />
+          Limpiar filtros
+        </Button>
       </div>
-
-      <Button
-        type="button"
-        variant="outline"
-        disabled={!hayFiltrosActivos}
-        onClick={() => {
-          setQ(VALORES_DEFECTO.q);
-          router.push(basePath);
-        }}
-        className="self-end"
-      >
-        <FilterX data-icon="inline-start" className="size-4" />
-        Limpiar filtros
-      </Button>
-    </div>
+    </>
   );
 }

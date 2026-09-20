@@ -170,6 +170,7 @@ export default async function ContratosPage({
           value={formatCOP(moraTotal)}
           tono={moraTotal > 0 ? "warning" : "success"}
           hint="saldo en mora actual"
+          href="/cartera"
         />
         <IconStatCard
           icon={CalendarClock}

@@ -22,6 +22,12 @@ import { registrarPago, type PagoFormState } from "./pagos-actions";
 
 const ESTADO_INICIAL: PagoFormState = {};
 
+function formatMiles(valor: string): string {
+  const digitos = valor.replace(/\D/g, "");
+  if (!digitos) return "";
+  return Number(digitos).toLocaleString("es-CO");
+}
+
 const TIPO_LABEL: Record<(typeof TIPOS_PAGO)[number], string> = {
   ARRIENDO: "Arriendo",
   ABONO_CAPITAL: "Abono a capital",
@@ -54,11 +60,15 @@ export function PagoForm({
   const [state, formAction] = useActionState(action, ESTADO_INICIAL);
   const formRef = useRef<HTMLFormElement>(null);
   const [tipo, setTipo] = useState<(typeof TIPOS_PAGO)[number]>("ARRIENDO");
+  const [montoDisplay, setMontoDisplay] = useState("");
+  const montoRaw = montoDisplay.replace(/\D/g, "");
 
   useEffect(() => {
     if (state.ok) {
       toast.success(tipo === "ABONO_CAPITAL" ? "Abono a capital registrado correctamente." : "Pago registrado correctamente.");
       formRef.current?.reset();
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- sincroniza el input formateado con el reset nativo del form
+      setMontoDisplay("");
       onSuccess?.();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -92,24 +102,35 @@ export function PagoForm({
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="flex flex-col gap-1">
+        <Label htmlFor="monto">Monto (COP)</Label>
+        <div className="relative">
+          <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-lg font-semibold text-muted-foreground">
+            $
+          </span>
+          <Input
+            id="monto"
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            required
+            autoFocus
+            placeholder="0"
+            value={montoDisplay}
+            onChange={(e) => setMontoDisplay(formatMiles(e.target.value))}
+            aria-invalid={state.fieldErrors?.monto ? true : undefined}
+            className="h-12 pl-7 text-xl font-semibold tabular-nums sm:text-2xl"
+          />
+        </div>
+        <input type="hidden" name="monto" value={montoRaw} />
+        <FormFieldError mensajes={state.fieldErrors?.monto} />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <div className="flex flex-col gap-1">
           <Label htmlFor="fecha">Fecha</Label>
           <Input id="fecha" name="fecha" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} />
           <FormFieldError mensajes={state.fieldErrors?.fecha} />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="monto">Monto (COP)</Label>
-          <Input
-            id="monto"
-            name="monto"
-            type="number"
-            required
-            autoFocus
-            max={tipo === "ABONO_CAPITAL" ? saldoCapitalPendiente : undefined}
-          />
-          <FormFieldError mensajes={state.fieldErrors?.monto} />
         </div>
 
         <div className="flex flex-col gap-1">

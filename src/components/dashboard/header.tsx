@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Bell, Bike, ChevronDown, LogOut, Menu, Search } from "lucide-react";
 import { cn } from "cn";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useHeaderOverride } from "./header-context";
 
 const formatoFecha = new Intl.DateTimeFormat("es-CO", {
@@ -111,6 +112,8 @@ export function Header({
       </div>
 
       <div className="ml-auto flex items-center gap-1.5 sm:gap-3">
+        <ThemeToggle />
+
         <Link
           href="/contratos"
           aria-label="Contratos que necesitan atención"

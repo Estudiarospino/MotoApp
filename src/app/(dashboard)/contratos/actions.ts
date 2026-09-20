@@ -99,12 +99,23 @@ export async function updateContrato(
   // `undefined` significa "no tocar el campo" para Prisma: los campos
   // opcionales que el usuario dejó vacíos deben mandarse como `null`
   // explícito para poder limpiarlos.
-  const { arriendoFijoMensual, metaMensualReferencia, cuotaDiariaReferencia, frecuenciaPago, fechaFinEstimada } =
-    parsed.data;
+  const {
+    fechaInicio,
+    valorTotalContrato,
+    saldoCapitalPendiente,
+    arriendoFijoMensual,
+    metaMensualReferencia,
+    cuotaDiariaReferencia,
+    frecuenciaPago,
+    fechaFinEstimada,
+  } = parsed.data;
 
   await prisma.contrato.update({
     where: { id },
     data: {
+      fechaInicio,
+      valorTotalContrato,
+      saldoCapitalPendiente,
       arriendoFijoMensual,
       metaMensualReferencia: metaMensualReferencia ?? null,
       cuotaDiariaReferencia: cuotaDiariaReferencia ?? null,

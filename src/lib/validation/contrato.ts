@@ -73,11 +73,15 @@ export function parseRenegociarContratoFormData(formData: FormData) {
 }
 
 /**
- * En edición no se puede cambiar cliente, moto, fecha de inicio ni el valor
- * total del contrato (ya fijó el saldo de capital inicial). Solo se corrigen
- * los términos que alimentan o acompañan el motor de cierre.
+ * En edición no se puede reasignar cliente ni moto (para eso existe la
+ * renegociación, que crea un contrato nuevo trazable). El resto de los
+ * términos, incluido el valor total y el saldo de capital pendiente, sí se
+ * pueden corregir — el saldo es un ajuste manual explícito del administrador.
  */
 export const editarContratoSchema = z.object({
+  fechaInicio: fechaDesdeFormulario,
+  valorTotalContrato: pesosPositivosDesdeFormulario,
+  saldoCapitalPendiente: pesosDesdeFormulario,
   arriendoFijoMensual: pesosPositivosDesdeFormulario,
   metaMensualReferencia: pesosOpcionalDesdeFormulario,
   cuotaDiariaReferencia: pesosOpcionalDesdeFormulario,
@@ -89,6 +93,9 @@ export type EditarContratoInput = z.infer<typeof editarContratoSchema>;
 
 export function parseEditarContratoFormData(formData: FormData) {
   return editarContratoSchema.safeParse({
+    fechaInicio: formData.get("fechaInicio"),
+    valorTotalContrato: formData.get("valorTotalContrato"),
+    saldoCapitalPendiente: formData.get("saldoCapitalPendiente"),
     arriendoFijoMensual: formData.get("arriendoFijoMensual"),
     metaMensualReferencia: formData.get("metaMensualReferencia"),
     cuotaDiariaReferencia: formData.get("cuotaDiariaReferencia"),

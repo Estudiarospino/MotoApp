@@ -48,7 +48,7 @@ export default async function DashboardHomePage() {
       orderBy: { moraAcumulada: "desc" },
       include: {
         cliente: { select: { nombreCompleto: true } },
-        motocicleta: { select: { placa: true } },
+        motocicleta: { select: { placa: true, marca: true, modelo: true } },
       },
     }),
     prisma.contrato.count(),
@@ -97,6 +97,7 @@ export default async function DashboardHomePage() {
           hint={`en ${contratosEnMora} contrato${contratosEnMora === 1 ? "" : "s"}`}
           tono={moraTotal > 0 ? "warning" : "success"}
           tendenciaPct={tendenciaMora.variacionPct}
+          href="/cartera"
         />
         <IconStatCard
           icon={AlertTriangle}
@@ -131,6 +132,7 @@ export default async function DashboardHomePage() {
                 id: c.id,
                 folio: c.folio,
                 clienteNombre: c.cliente.nombreCompleto,
+                motoNombre: `${c.motocicleta.placa} — ${c.motocicleta.marca} ${c.motocicleta.modelo}`,
                 saldoCapitalPendiente: c.saldoCapitalPendiente,
               }))}
             metodosPago={metodosPago}

@@ -118,6 +118,9 @@ export default async function ContratoDetallePage({
   ]);
 
   const valoresInicialesTerminos = {
+    fechaInicio: toFechaInputValue(contrato.fechaInicio),
+    valorTotalContrato: contrato.valorTotalContrato.toString(),
+    saldoCapitalPendiente: contrato.saldoCapitalPendiente.toString(),
     arriendoFijoMensual: contrato.arriendoFijoMensual.toString(),
     metaMensualReferencia: contrato.metaMensualReferencia?.toString(),
     cuotaDiariaReferencia: contrato.cuotaDiariaReferencia?.toString(),

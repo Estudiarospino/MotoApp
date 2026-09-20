@@ -4,6 +4,7 @@ import {
   ClipboardList,
   HandCoins,
   Home,
+  Landmark,
   Receipt,
   Settings,
   UserCog,
@@ -53,7 +54,16 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     label: "Finanzas",
     items: [
-      { label: "Pagos y recibos", href: "/pagos", icon: Receipt },
+      { label: "Cartera", href: "/cartera", icon: Landmark },
+      {
+        label: "Pagos y recibos",
+        href: "/pagos",
+        icon: Receipt,
+        children: [
+          { label: "Ver todos", href: "/pagos" },
+          { label: "Calendario", href: "/pagos/calendario" },
+        ],
+      },
       {
         label: "Gastos",
         href: "/gastos",

@@ -78,27 +78,31 @@ export default async function EditarMotoPage({
         <span className="font-medium text-foreground">{moto.placa}</span>
       </nav>
 
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Editar moto</h1>
-        <div className="max-w-xl">
-          <MotoForm
-            action={actionConId}
-            valoresIniciales={{
-              marca: moto.marca,
-              modelo: moto.modelo,
-              placa: moto.placa,
-              color: moto.color ?? undefined,
-              anioModelo: moto.anioModelo?.toString(),
-              precioInicial: moto.precioInicial.toString(),
-              soatFechaExpedicion: moto.soatFechaExpedicion ? toFechaInputValue(moto.soatFechaExpedicion) : undefined,
-              tecnomecanicaFechaExpedicion: moto.tecnomecanicaFechaExpedicion
-                ? toFechaInputValue(moto.tecnomecanicaFechaExpedicion)
-                : undefined,
-              notas: moto.notas ?? undefined,
-              fotoUrl: moto.fotoUrl ?? undefined,
-            }}
-          />
-        </div>
+        <Card className="max-w-2xl">
+          <CardContent>
+            <MotoForm
+              action={actionConId}
+              valoresIniciales={{
+                marca: moto.marca,
+                modelo: moto.modelo,
+                placa: moto.placa,
+                color: moto.color ?? undefined,
+                anioModelo: moto.anioModelo?.toString(),
+                precioInicial: moto.precioInicial.toString(),
+                soatFechaExpedicion: moto.soatFechaExpedicion
+                  ? toFechaInputValue(moto.soatFechaExpedicion)
+                  : undefined,
+                tecnomecanicaFechaExpedicion: moto.tecnomecanicaFechaExpedicion
+                  ? toFechaInputValue(moto.tecnomecanicaFechaExpedicion)
+                  : undefined,
+                notas: moto.notas ?? undefined,
+                fotoUrl: moto.fotoUrl ?? undefined,
+              }}
+            />
+          </CardContent>
+        </Card>
       </div>
 
       <div className="flex flex-col gap-3">

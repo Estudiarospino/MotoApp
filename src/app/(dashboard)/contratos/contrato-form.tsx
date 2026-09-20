@@ -49,7 +49,9 @@ function sumarMeses(fechaInicioIso: string, mesesTexto: string): string {
 }
 
 type TerminosIniciales = {
+  fechaInicio?: string;
   valorTotalContrato?: string;
+  saldoCapitalPendiente?: string;
   arriendoFijoMensual?: string;
   metaMensualReferencia?: string;
   cuotaDiariaReferencia?: string;
@@ -93,7 +95,7 @@ export function ContratoForm(props: ContratoFormProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
-  const [fechaInicio, setFechaInicio] = useState("");
+  const [fechaInicio, setFechaInicio] = useState(valoresIniciales?.fechaInicio ?? "");
   const [plazoMeses, setPlazoMeses] = useState("");
   const [fechaFinEstimada, setFechaFinEstimada] = useState(valoresIniciales?.fechaFinEstimada ?? "");
   const [valorTotalContrato, setValorTotalContrato] = useState(valoresIniciales?.valorTotalContrato ?? "");
@@ -268,6 +270,58 @@ export function ContratoForm(props: ContratoFormProps) {
                 : "Se autocompleta con el precio registrado de la moto; ajústalo si el valor pactado es distinto."}
             </p>
             <FormFieldError mensajes={state.fieldErrors?.valorTotalContrato} />
+          </div>
+        </>
+      )}
+
+      {props.modo === "editar" && (
+        <>
+          <div className="flex flex-col gap-2 rounded-lg border border-warning/30 bg-warning/[0.06] p-3">
+            <p className="text-xs text-muted-foreground">
+              El valor total y el saldo de capital son un ajuste manual: corrígelos solo si hay un error de captura,
+              no reflejan pagos automáticamente.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="fechaInicio">Fecha de inicio</Label>
+              <Input
+                id="fechaInicio"
+                name="fechaInicio"
+                type="date"
+                required
+                value={fechaInicio}
+                onChange={(e) => setFechaInicio(e.target.value)}
+              />
+              <FormFieldError mensajes={state.fieldErrors?.fechaInicio} />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="valorTotalContrato">Valor total del contrato (COP)</Label>
+              <Input
+                id="valorTotalContrato"
+                name="valorTotalContrato"
+                type="number"
+                value={valorTotalContrato}
+                onChange={(e) => setValorTotalContrato(e.target.value)}
+                required
+              />
+              <FormFieldError mensajes={state.fieldErrors?.valorTotalContrato} />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="saldoCapitalPendiente">Saldo de capital pendiente (COP)</Label>
+            <Input
+              id="saldoCapitalPendiente"
+              name="saldoCapitalPendiente"
+              type="number"
+              min={0}
+              defaultValue={valoresIniciales?.saldoCapitalPendiente}
+              required
+            />
+            <FormFieldError mensajes={state.fieldErrors?.saldoCapitalPendiente} />
           </div>
         </>
       )}
