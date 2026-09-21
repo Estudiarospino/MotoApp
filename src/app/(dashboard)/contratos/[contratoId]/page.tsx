@@ -43,6 +43,7 @@ import { TabPeriodos } from "@/components/contratos/tab-periodos";
 import { TabResumenFinanciero } from "@/components/contratos/tab-resumen-financiero";
 import { TabDocumentos } from "@/components/contratos/tab-documentos";
 import { TabNotas } from "@/components/contratos/tab-notas";
+import { ProgressRing } from "@/components/contratos/progress-ring";
 import { PrestamoDialog } from "@/app/(dashboard)/prestamos/prestamo-dialog";
 import type { ContratoParaPrestamo } from "@/app/(dashboard)/prestamos/prestamo-form";
 
@@ -360,20 +361,21 @@ export default async function ContratoDetallePage({
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <div>
-              <div className="mb-2 flex items-center justify-between text-sm">
-                <span className="font-medium text-muted-foreground">Progreso de compra</span>
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">{progresoCompra}%</span>
+            <div className="flex items-center gap-4">
+              <ProgressRing value={progresoCompra} label="Completado" />
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <span className="text-sm font-medium text-muted-foreground">Capital abonado</span>
+                <p className="truncate text-xl font-bold tabular-nums text-foreground">{formatCOP(abonadoCapital)}</p>
+                <p className="text-xs text-muted-foreground">de {formatCOP(contrato.valorTotalContrato)}</p>
+                <Progress value={progresoCompra} className="mt-1">
+                  <ProgressTrack className="h-1.5">
+                    <ProgressIndicator />
+                  </ProgressTrack>
+                </Progress>
               </div>
-              <Progress value={progresoCompra}>
-                <ProgressTrack className="h-2.5">
-                  <ProgressIndicator />
-                </ProgressTrack>
-              </Progress>
             </div>
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+            <div className="grid grid-cols-3 gap-2.5">
               <MiniStat etiqueta="Precio de la moto" valor={formatCOP(contrato.valorTotalContrato)} />
-              <MiniStat etiqueta="Abonado a capital" valor={formatCOP(abonadoCapital)} tono="success" sub={`${progresoCompra}%`} />
               <MiniStat
                 etiqueta="Saldo pendiente"
                 valor={formatCOP(contrato.saldoCapitalPendiente)}
